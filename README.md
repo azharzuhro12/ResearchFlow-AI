@@ -593,6 +593,11 @@ distributed SaaS:
   scope); the tool fetches public web pages, not internal networks.
 - Discord delivery is an incoming webhook — post-only, one channel, no
   bot commands or reads.
+- **English-first by design**: the UI, research plans, and search queries
+  are English-only. A question in another language (e.g. Indonesian) is
+  understood by GLM, but queries and sources stay English and the
+  embedding model is English-optimized, so non-English retrieval quality
+  is lower and output language is not guaranteed.
 
 ## 24. Future Improvements
 
