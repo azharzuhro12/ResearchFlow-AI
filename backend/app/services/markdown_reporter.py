@@ -1,0 +1,192 @@
+"""Markdown report rendering — deterministic, no LLM.
+
+Converts a validated SynthesisOutcome into a clean Markdown document.
+Citation markers ([E1], [E2], ...) from the synthesis answer are preserved
+verbatim; source metadata comes only from the validated citation objects,
+never from the LLM. All formatting is plain string work, so the same input
+always produces the same output.
+"""
+
+import re
+
+from app.services.synthesis_service import (
+    INSUFFICIENT_EVIDENCE_ANSWER,
+    STATUS_INSUFFICIENT_EVIDENCE,
+    STATUS_UNGROUNDED,
+    SynthesisOutcome,
+)
+
+# Heading line in the synthesis answer, e.g. "## Key Findings".
+_HEADING_RE = re.compile(r"^(#{1,6})\s*(.+?)\s*#*\s*$", re.MULTILINE)
+# Characters that carry meaning in Markdown inline syntax.
+_INLINE_SPECIALS = str.maketrans(
+    {
+        "*": "\\*",
+        "_": "\\_",
+        "`": "\\`",
+        "[": "\\[",
+        "]": "\\]",
+        "<": "\\<",
+    }
+)
+
+_SUMMARY_KEYS = ("summary", "executivesummary", "overview")
+_FINDINGS_KEYS = ("finding", "findings", "keyfindings")
+_CONCLUSION_KEYS = ("conclusion", "conclusions", "takeaway", "takeaways")
+
+
+class Section:
+    """One extracted heading + body block from the synthesis answer."""
+
+    def __init__(self, heading: str, body: str) -> None:
+        self.heading = heading
+        self.body = body.strip()
+
+
+def _slug_heading(heading: str) -> str:
+    """Normalize a heading for matching (lowercase, alphanumeric only)."""
+    return re.sub(r"[^a-z0-9]", "", heading.lower())
+
+
+def _escape_inline(text: str) -> str:
+    """Escape Markdown inline syntax in untrusted one-line metadata."""
+    return text.translate(_INLINE_SPECIALS)
+
+
+def _one_line(text: str) -> str:
+    """Collapse newlines/tabs so user input can never inject headings."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def split_answer_sections(answer: str) -> tuple[list[Section], str]:
+    """Split the synthesis answer into headed sections + leading prose.
+
+    Returns (sections, preamble) where preamble is any text before the
+    first heading. Purely deterministic string parsing.
+    """
+    matches = list(_HEADING_RE.finditer(answer))
+    if not matches:
+        return [], answer.strip()
+
+    preamble = answer[: matches[0].start()].strip()
+    sections: list[Section] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(answer)
+        sections.append(Section(match.group(2), answer[match.end() : end]))
+    return sections, preamble
+
+
+def classify_answer(sections: list[Section], preamble: str) -> dict[str, str]:
+    """Extract report slots from the synthesis answer deterministically.
+
+    Slots: "summary", "findings", "conclusion". Sections whose heading does
+    not match a slot are simply left in the answer — the Detailed Analysis
+    section always carries the COMPLETE synthesis answer verbatim, so no
+    content is ever dropped or rewritten. Shared by both reporters.
+    """
+    slots: dict[str, str] = {"summary": "", "findings": "", "conclusion": ""}
+
+    for section in sections:
+        key = _slug_heading(section.heading)
+        if any(k in key for k in _SUMMARY_KEYS) and not slots["summary"]:
+            slots["summary"] = section.body
+        elif any(k in key for k in _FINDINGS_KEYS) and not slots["findings"]:
+            slots["findings"] = section.body
+        elif any(k in key for k in _CONCLUSION_KEYS) and not slots["conclusion"]:
+            slots["conclusion"] = section.body
+
+    # Deterministic fallbacks — extracted from the answer, never invented.
+    if not slots["summary"]:
+        fallback_text = preamble or (sections[0].body if sections else "")
+        slots["summary"] = fallback_text.split("\n\n")[0].strip()
+    if not slots["conclusion"]:
+        slots["conclusion"] = (
+            "The synthesis did not produce an explicit conclusion section; "
+            "see the detailed analysis above."
+        )
+    return slots
+
+
+def render_markdown(outcome: SynthesisOutcome) -> str:
+    """Render a validated synthesis outcome as a Markdown research report."""
+    question = _escape_inline(_one_line(outcome.query))
+    lines: list[str] = [
+        "# Research Report",
+        "",
+        f"**Research Question:** {question}",
+        "",
+    ]
+
+    if outcome.status == STATUS_INSUFFICIENT_EVIDENCE:
+        lines += [
+            "> **Status: Insufficient Evidence**",
+            ">",
+            "> The available retrieved evidence was not sufficient to produce "
+            + "a grounded research answer. Index more sources and try again.",
+            "",
+            "## Detailed Analysis",
+            "",
+            _escape_inline(INSUFFICIENT_EVIDENCE_ANSWER),
+            "",
+            "## Sources",
+        ]
+        if not outcome.citations:
+            lines.append("")
+            lines.append("_No validated sources — no citations were produced._")
+        return "\n".join(lines).rstrip() + "\n"
+
+    if outcome.status == STATUS_UNGROUNDED:
+        lines += [
+            "> **Status: Ungrounded**",
+            ">",
+            "> The generated answer could not be sufficiently grounded in the "
+            + "retrieved evidence — treat the analysis below with caution.",
+            "",
+        ]
+
+    slots = classify_answer(*split_answer_sections(outcome.answer))
+    lines += [
+        "## Executive Summary",
+        "",
+        slots["summary"] or "No summary was produced by the synthesis.",
+        "",
+        "## Key Findings",
+        "",
+        slots["findings"] or "The synthesis did not report separate key findings.",
+        "",
+        "## Detailed Analysis",
+        "",
+        # The COMPLETE validated synthesis answer, verbatim — headings and
+        # citation markers preserved.
+        outcome.answer,
+        "",
+        "## Conclusion",
+        "",
+        slots["conclusion"],
+        "",
+        "## Sources",
+    ]
+
+    if not outcome.citations:
+        lines += ["", "_No validated citations were attached to this answer._"]
+    else:
+        for citation in outcome.citations:
+            title = _escape_inline(_one_line(citation.source_title or citation.source_url))
+            domain = _escape_inline(_one_line(citation.source_domain or "unknown"))
+            url = citation.source_url.replace("(", "%28").replace(")", "%29")
+            lines += [
+                "",
+                f"### [{citation.evidence_id}] {title}",
+                "",
+                f"* URL: <{url}>",
+                f"* Domain: {domain}",
+                f"* Chunk: {citation.chunk_index}",
+            ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+class MarkdownReporter:
+    """Renders a validated synthesis outcome as a Markdown report."""
+
+    def render(self, outcome: SynthesisOutcome) -> str:
+        return render_markdown(outcome)

@@ -1,0 +1,12 @@
+# Never send these into the backend build context.
+# .env is the critical one: secrets must exist only at runtime (env_file),
+# never inside an image layer.
+.env
+.venv
+__pycache__
+.pytest_cache
+tests
+data
+reports
+.models
+*.db

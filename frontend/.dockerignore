@@ -1,0 +1,8 @@
+# Never send these into the frontend build context. .env.local is excluded
+# on purpose: the API base URL is provided as a build ARG, and anything
+# secret must never be part of a frontend build at all.
+node_modules
+.next
+.env.local
+.env*
+npm-debug.log*

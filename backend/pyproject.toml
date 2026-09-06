@@ -1,0 +1,17 @@
+[project]
+name = "researchflow-backend"
+version = "0.1.0"
+description = "ResearchFlow AI — FastAPI backend (Autonomous AI Research Automation Platform)"
+requires-python = ">=3.14"
+
+[tool.ruff.lint]
+# Two deliberately accepted patterns:
+# - B008: `Depends(...)` in argument defaults is THE FastAPI dependency
+#   injection idiom (see FastAPI docs); the alternative style hides the
+#   dependency from OpenAPI tooling.
+# - BLE001: blind `except Exception` at service boundaries around
+#   third-party model/Chroma/httpx calls, each mapped to a client-safe
+#   error — a crash there must never take down the API process.
+# Everything else stays enforced (including DTZ001 naive-datetime and
+# C408 dict-literal checks).
+ignore = ["B008", "BLE001"]

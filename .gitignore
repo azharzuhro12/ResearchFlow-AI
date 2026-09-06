@@ -1,0 +1,38 @@
+# Environment variables & credentials (never commit real keys)
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Local databases (SQLite + WAL/SHM sidecar files)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local vector store (ChromaDB) & embedding-model caches (incl. Docker HF_HOME)
+data/chroma/
+data/hf/
+.models/
+
+# Generated research reports (keep the directory, ignore the outputs)
+reports/*.md
+reports/*.pdf
+
+# Claude Code machine-local state (permissions, session data)
+.claude/
+
+# OS junk
+.DS_Store

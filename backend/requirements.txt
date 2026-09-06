@@ -1,0 +1,17 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-dotenv==1.2.3
+httpx==0.28.1
+ddgs==9.16.0
+# Step 4 — RAG: torch 2.14.0 is installed from the CPU-only wheel index
+# (pip install torch --index-url https://download.pytorch.org/whl/cpu).
+torch==2.14.0
+sentence-transformers==6.0.1
+chromadb==1.5.9
+beautifulsoup4==4.15.0
+# Step 6 — local PDF report rendering (fully offline, no remote resources).
+reportlab==5.0.1
+# Step 7 — in-process scheduler for recurring research jobs (no Celery/Redis).
+apscheduler==3.11.3
+# Step 9 — SQLite persistence (schedules, executions, report metadata).
+sqlalchemy==2.0.52

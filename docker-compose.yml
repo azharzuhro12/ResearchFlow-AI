@@ -1,0 +1,63 @@
+# ResearchFlow AI — local/self-hosted deployment.
+#
+#   docker compose up --build
+#
+# Backend:  http://localhost:8010  (container listens on 8000)
+# Frontend: http://localhost:3000
+#
+# Persistence: ./data (SQLite database + ChromaDB + embedding-model cache)
+# and ./reports (generated Markdown/PDF reports) are bind-mounted, so
+# container restarts and rebuilds lose nothing.
+#
+# Secrets: backend/.env (git-ignored) is passed to the backend container at
+# RUNTIME via env_file. It is excluded from both build contexts by
+# .dockerignore and never reaches the frontend image.
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      # Host port 8010 (container listens on 8000 internally)
+      - "8010:8000"
+    env_file:
+      # GLM_API_KEY, GLM_MODEL, GLM_BASE_URL, DISCORD_WEBHOOK_URL,
+      # DATABASE_URL, DEFAULT_SCHEDULE_TIMEZONE — all optional except the
+      # GLM pair; the file itself is git-ignored.
+      - path: ./backend/.env
+        required: false
+    environment:
+      # Keep the embedding-model download inside the persisted data volume
+      # (config.py only sets HF_HOME when it is not already provided).
+      HF_HOME: /app/data/hf
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    healthcheck:
+      # python:slim has no curl/wget; use the stdlib against /health.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # First boot may download the embedding model (~90 MB) before serving.
+      start_period: 60s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # PUBLIC by design — the URL the user's browser uses to reach the
+        # backend. Override for remote hosting; never put secrets here.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8010}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
