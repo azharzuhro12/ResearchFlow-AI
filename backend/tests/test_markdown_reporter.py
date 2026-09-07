@@ -27,13 +27,13 @@ def _outcome(**overrides) -> SynthesisOutcome:
         "status": "success",
         "query": "What are the latest RAG techniques?",
         "answer": (
-            "## Executive Summary\n"
-            "Hybrid retrieval is the dominant trend.\n\n"
-            "## Key Findings\n"
-            "Hybrid search improves recall [E1].\n\n"
-            "Reranking lifts precision [E2].\n\n"
-            "## Conclusion\n"
-            "RAG pipelines keep improving."
+            "## Ringkasan\n"
+            "Retrieval hybrid menjadi tren dominan.\n\n"
+            "## Temuan Utama\n"
+            "Pencarian hybrid meningkatkan recall [E1].\n\n"
+            "Reranking menaikkan presisi [E2].\n\n"
+            "## Kesimpulan\n"
+            "Pipeline RAG terus membaik."
         ),
         "citations": [_citation("E1", 1), _citation("E2", 2)],
         "evidence_count": 2,
@@ -49,13 +49,13 @@ def test_report_has_required_sections() -> None:
     markdown = render_markdown(_outcome())
 
     for heading in (
-        "# Research Report",
-        "**Research Question:**",
-        "## Executive Summary",
-        "## Key Findings",
-        "## Detailed Analysis",
-        "## Conclusion",
-        "## Sources",
+        "# Laporan Riset",
+        "**Pertanyaan Riset:**",
+        "## Ringkasan Eksekutif",
+        "## Temuan Utama",
+        "## Analisis Rinci",
+        "## Kesimpulan",
+        "## Sumber",
     ):
         assert heading in markdown
 
@@ -93,7 +93,7 @@ def test_sources_empty_when_no_citations() -> None:
     markdown = render_markdown(
         _outcome(answer="Ungrounded claim.", citations=[])
     )
-    assert "No validated citations" in markdown
+    assert "Tidak ada sitasi tervalidasi" in markdown
 
 
 # ---------------------------------------------------------- honest statuses
@@ -110,8 +110,8 @@ def test_insufficient_evidence_report_is_explicit() -> None:
         )
     )
 
-    assert "Insufficient Evidence" in markdown
-    assert "## Sources" in markdown
+    assert "Bukti Belum Cukup" in markdown
+    assert "## Sumber" in markdown
     # No fabricated findings or citations.
     assert "### [E" not in markdown
 
@@ -121,7 +121,7 @@ def test_ungrounded_report_carries_caution_banner() -> None:
         _outcome(status="ungrounded", answer="Claim without citations.", citations=[])
     )
 
-    assert "Ungrounded" in markdown
+    assert "Tanpa Grounding" in markdown
     # Still renders the analysis; it is simply flagged, not hidden.
     assert "Claim without citations." in markdown
 
@@ -133,7 +133,7 @@ def test_malicious_question_cannot_inject_markdown_structure() -> None:
     malicious = "RAG research\n\n# FAKE HEADING\n\n<script>alert(1)</script>"
     markdown = render_markdown(_outcome(query=malicious))
 
-    assert "# Research Report" in markdown
+    assert "# Laporan Riset" in markdown
     # The question is collapsed to one escaped line: the fake heading can
     # only appear mid-line (never at line start), so it renders as text.
     assert "\n# FAKE HEADING" not in markdown
@@ -184,12 +184,21 @@ def test_split_answer_sections_and_classify() -> None:
     # No findings heading -> deterministic empty slot, not invented text.
     assert slots["findings"] == ""
 
+    # Indonesian headings (the prompt's primary output) classify as well.
+    id_sections, _ = split_answer_sections(
+        "Pengantar.\n\n## Ringkasan\nSingkat.\n\n## Temuan Utama\nTemuan.\n\n## Kesimpulan\nSelesai."
+    )
+    id_slots = classify_answer(id_sections, "Pengantar.")
+    assert id_slots["summary"] == "Singkat."
+    assert id_slots["findings"] == "Temuan."
+    assert id_slots["conclusion"] == "Selesai."
+
 
 def test_classify_falls_back_to_first_paragraph() -> None:
     sections, preamble = split_answer_sections("First paragraph.\n\nSecond paragraph.")
     slots = classify_answer(sections, preamble)
     assert slots["summary"] == "First paragraph."
-    assert "did not produce an explicit conclusion" in slots["conclusion"]
+    assert "tidak menghasilkan bagian kesimpulan eksplisit" in slots["conclusion"]
 
 
 def test_markdown_reporter_facade_matches_function() -> None:

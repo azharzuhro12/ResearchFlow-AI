@@ -128,18 +128,18 @@ export function SynthesisPanel() {
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-      <h3 className="text-lg font-semibold text-zinc-100">Research Answer</h3>
+      <h3 className="text-lg font-semibold text-zinc-100">Jawaban Riset</h3>
       <p className="mt-1 text-sm text-zinc-400">
-        Generate a grounded answer from the indexed knowledge base. Every
-        factual claim is tied to a numbered source [E1], [E2], ... mapped
-        server-side to the real indexed pages.
+        Susun jawaban berbasis sumber (grounded) dari basis pengetahuan yang
+        telah diindeks. Setiap klaim faktual dikaitkan dengan sumber bernomor
+        [E1], [E2], ... yang dipetakan di server ke halaman aslinya.
       </p>
       <form onSubmit={handleSynthesize} className="mt-4 space-y-4">
         <label
           htmlFor="synthesis-question"
           className="block text-sm font-medium text-zinc-300"
         >
-          Research question
+          Pertanyaan riset
         </label>
         <textarea
           id="synthesis-question"
@@ -147,14 +147,14 @@ export function SynthesisPanel() {
           onChange={(event) => setQuestion(event.target.value)}
           rows={2}
           maxLength={2000}
-          placeholder="e.g. What are the latest RAG techniques?"
+          placeholder="mis. Apa teknik RAG terbaru?"
           className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
         />
         <div className="flex items-center justify-between gap-3">
           <p className="min-h-4 text-xs text-zinc-500">
             {trimmedQuestion.length > 0 &&
             trimmedQuestion.length < MIN_QUERY_LENGTH
-              ? `Question must be at least ${MIN_QUERY_LENGTH} characters.`
+              ? `Pertanyaan minimal ${MIN_QUERY_LENGTH} karakter.`
               : ""}
           </p>
           <button
@@ -168,7 +168,7 @@ export function SynthesisPanel() {
                 aria-hidden="true"
               />
             )}
-            {status === "loading" ? "Generating research answer..." : "Generate Research Answer"}
+            {status === "loading" ? "Menyusun jawaban riset..." : "Buat Jawaban Riset"}
           </button>
         </div>
       </form>
@@ -178,7 +178,7 @@ export function SynthesisPanel() {
           role="alert"
           className="mt-4 rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
         >
-          Unable to generate the research answer. Please try again.
+          Gagal menyusun jawaban riset. Silakan coba lagi.
         </div>
       )}
 
@@ -187,8 +187,8 @@ export function SynthesisPanel() {
           role="status"
           className="mt-4 rounded-xl border border-amber-900/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-300"
         >
-          There is not enough indexed evidence to answer this question. Try
-          indexing more sources first.
+          Bukti terindeks belum cukup untuk menjawab pertanyaan ini. Coba
+          indeks lebih banyak sumber dulu.
         </div>
       )}
 
@@ -199,8 +199,9 @@ export function SynthesisPanel() {
               role="status"
               className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-300"
             >
-              The generated answer could not be tied to specific indexed
-              evidence, so no citations are shown. Treat it with caution.
+              Jawaban yang dihasilkan tidak dapat dikaitkan dengan bukti
+              terindeks spesifik, sehingga tidak ada sitasi yang ditampilkan.
+              Perlakukan dengan hati-hati.
             </div>
           )}
           <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
@@ -218,18 +219,17 @@ export function SynthesisPanel() {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500" role="status">
-              Based on {result.evidenceCount} indexed evidence block
-              {result.evidenceCount === 1 ? "" : "s"}.
+              Berdasarkan {result.evidenceCount} blok bukti terindeks.
             </p>
           </div>
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
             <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-              Research Report
+              Laporan Riset
             </h4>
             <p className="mt-1 text-sm text-zinc-400">
-              Download this research answer as a formatted report with the
-              validated sources.
+              Unduh jawaban riset ini sebagai laporan terformat beserta
+              sumber tervalidasi.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
@@ -245,15 +245,15 @@ export function SynthesisPanel() {
                   />
                 )}
                 {reportStatus === "loading"
-                  ? "Generating report..."
-                  : "Generate Report"}
+                  ? "Membuat laporan..."
+                  : "Buat Laporan"}
               </button>
               {report && (
                 <a
                   href={report.markdownUrl}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-zinc-100"
                 >
-                  Download Markdown
+                  Unduh Markdown
                 </a>
               )}
               {report && (
@@ -261,13 +261,13 @@ export function SynthesisPanel() {
                   href={report.pdfUrl}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-zinc-100"
                 >
-                  Download PDF
+                  Unduh PDF
                 </a>
               )}
             </div>
             {report && (
               <p className="mt-3 text-xs text-zinc-500" role="status">
-                Report ID: {report.reportId}
+                ID Laporan: {report.reportId}
               </p>
             )}
             {reportStatus === "error" && (
@@ -275,7 +275,7 @@ export function SynthesisPanel() {
                 role="alert"
                 className="mt-3 rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
               >
-                Unable to generate the report. Please try again.
+                Gagal membuat laporan. Silakan coba lagi.
               </p>
             )}
           </div>
@@ -283,7 +283,7 @@ export function SynthesisPanel() {
           {result.citations.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                Sources
+                Sumber
               </h4>
               <ul className="mt-3 space-y-3">
                 {result.citations.map((citation) => (
@@ -316,7 +316,7 @@ export function SynthesisPanel() {
                       rel="noopener noreferrer"
                       className="mt-2 inline-block text-sm font-medium text-sky-400 transition hover:text-sky-300"
                     >
-                      Open Source →
+                      Buka Sumber →
                     </a>
                   </li>
                 ))}

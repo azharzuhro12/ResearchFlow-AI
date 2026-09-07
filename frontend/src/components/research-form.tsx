@@ -91,7 +91,7 @@ export function ResearchForm() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
       <h2 className="text-center text-xl font-semibold text-zinc-200">
-        Start a Research
+        Mulai Riset
       </h2>
 
       <form
@@ -99,7 +99,7 @@ export function ResearchForm() {
         className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6"
       >
         <label htmlFor="question" className="block text-sm font-medium text-zinc-300">
-          What would you like to research?
+          Apa yang ingin kamu teliti?
         </label>
         <textarea
           id="question"
@@ -107,13 +107,13 @@ export function ResearchForm() {
           onChange={(event) => setQuestion(event.target.value)}
           rows={3}
           maxLength={2000}
-          placeholder="What are the latest RAG techniques in 2026?"
+          placeholder="Apa teknik RAG terbaru pada 2026?"
           className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
         />
         <div className="flex flex-col-reverse items-center justify-between gap-3 sm:flex-row">
           <p className="min-h-4 text-xs text-zinc-500">
             {trimmed.length > 0 && trimmed.length < MIN_QUESTION_LENGTH
-              ? `Question must be at least ${MIN_QUESTION_LENGTH} characters.`
+              ? `Pertanyaan minimal ${MIN_QUESTION_LENGTH} karakter.`
               : ""}
           </p>
           <button
@@ -127,7 +127,7 @@ export function ResearchForm() {
                 aria-hidden="true"
               />
             )}
-            {status === "loading" ? "Generating research plan..." : "Generate Research Plan"}
+            {status === "loading" ? "Menyusun rencana riset..." : "Buat Rencana Riset"}
           </button>
         </div>
       </form>
@@ -137,17 +137,17 @@ export function ResearchForm() {
           role="alert"
           className="rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
         >
-          Failed to generate research plan.
+          Gagal menyusun rencana riset.
         </div>
       )}
 
       {status === "success" && result && (
         <>
           <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-            <h3 className="text-lg font-semibold text-zinc-100">Research Plan</h3>
+            <h3 className="text-lg font-semibold text-zinc-100">Rencana Riset</h3>
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Research Question
+                Pertanyaan Riset
               </p>
               <p className="leading-relaxed text-zinc-200">{result.question}</p>
             </div>
@@ -173,7 +173,7 @@ export function ResearchForm() {
                   aria-hidden="true"
                 />
               )}
-              {searchStatus === "loading" ? "Searching the web..." : "Search Sources"}
+              {searchStatus === "loading" ? "Mencari di web..." : "Cari Sumber"}
             </button>
           </div>
         </>
@@ -184,7 +184,7 @@ export function ResearchForm() {
           role="alert"
           className="rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
         >
-          Unable to search the web. Please try again.
+          Gagal mencari di web. Silakan coba lagi.
         </div>
       )}
 

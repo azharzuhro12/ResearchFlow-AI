@@ -13,7 +13,7 @@ Convert the user's research question into a short, structured research plan.
 
 Rules:
 - Produce between 3 and 7 steps.
-- Each step is one short sentence (max 20 words), in English.
+- Each step is one short sentence (max 20 words), written in Indonesian (Bahasa Indonesia).
 - Steps must be concrete and directly relevant to the research question.
 - Order the steps logically (e.g. identify, analyze, compare, review, summarize).
 - You are ONLY planning. Do NOT perform the research, do NOT search for or mention specific sources, and do NOT include any citations or references.
@@ -37,7 +37,7 @@ class ResearchPlanner:
         """Return a list of research steps for the given question."""
         user_prompt = (
             f"Research question: {question}\n\n"
-            "Return the research plan as strict JSON."
+            "Return the research plan as strict JSON, with every step written in Indonesian."
         )
         raw = await self.glm.complete(PLANNER_SYSTEM_PROMPT, user_prompt)
         return parse_plan_payload(raw)

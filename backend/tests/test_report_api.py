@@ -168,7 +168,7 @@ def test_report_insufficient_evidence_still_generates(
     body = response.json()
     assert body["synthesis_status"] == "insufficient_evidence"
     markdown = (reports_dir / body["markdown_filename"]).read_text()
-    assert "Insufficient Evidence" in markdown
+    assert "Bukti Belum Cukup" in markdown
 
 
 @pytest.mark.parametrize(
@@ -238,7 +238,7 @@ def test_download_markdown_returns_file(reports_dir: Path) -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/markdown")
-    assert "# Research Report" in response.text
+    assert "# Laporan Riset" in response.text
     assert "https://example.com/source-1" in response.text
 
 

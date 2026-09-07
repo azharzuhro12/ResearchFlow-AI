@@ -3,7 +3,9 @@
 All HTTP goes through httpx.MockTransport — no real Discord request is
 ever made, and no Discord credential is required. These tests verify URL
 validation (SSRF guard), placeholder handling, payload structure/limits,
-retry bounds, and that the webhook URL never leaks into payloads or logs.
+the research-result content contract (summary, findings, statistics,
+validated citations — no attachments), retry bounds, and that the webhook
+URL never leaks into payloads or logs.
 """
 
 import asyncio
@@ -18,8 +20,13 @@ from app.services.discord_service import (
     COLOR_FAILURE,
     COLOR_SUCCESS,
     FAILURE_TITLE,
+    MAX_CITATION_ITEMS,
+    MAX_CITATIONS_LENGTH,
     MAX_ERROR_LENGTH,
     MAX_FIELD_LENGTH,
+    MAX_FINDINGS_ITEMS,
+    MAX_FINDINGS_LENGTH,
+    MAX_SUMMARY_LENGTH,
     REQUEST_TIMEOUT_SECONDS,
     RETRY_DELAY_SECONDS,
     STATUS_FAILED,
@@ -29,8 +36,39 @@ from app.services.discord_service import (
     DiscordNotificationService,
     is_valid_discord_webhook_url,
 )
+from app.services.research_execution_service import CitationSummary
 
 VALID_WEBHOOK = "https://discord.com/api/webhooks/1234567890/abcDEF123-_"
+
+SUMMARY_TEXT = (
+    "RAG terus berkembang pesat: kurasi sumber, chunking adaptif, "
+    "evaluasi grounding, dan integrasi alat eksternal."
+)
+FINDINGS_TEXT = (
+    "- Kurasi sumber sebelum indeksasi menaikkan kualitas jawaban.\n"
+    "2. Evaluasi grounding kini jadi standar de facto publikasi RAG.\n"
+    "• Chunking adaptif menggantikan pemotongan tetap pada korpus panjang."
+)
+CITATIONS = (
+    CitationSummary(
+        evidence_id="E1",
+        title="Retrieval-Augmented Generation survey",
+        url="https://example.com/papers/rag-survey",
+        domain="example.com",
+    ),
+    CitationSummary(
+        evidence_id="E2",
+        title="Grounding evaluation toolkit",
+        url="https://tools.example.org/grounding",
+        domain="tools.example.org",
+    ),
+    CitationSummary(
+        evidence_id="E3",
+        title="",  # sparse record: no title → the domain becomes the label
+        url="https://notes.example.io/chunking",
+        domain="notes.example.io",
+    ),
+)
 
 SUCCESS_KWARGS = {
     "question": "What are the latest developments in Retrieval-Augmented Generation?",
@@ -39,6 +77,10 @@ SUCCESS_KWARGS = {
     "sources_found": 12,
     "completed_at": datetime(2026, 9, 6, 1, 0, tzinfo=UTC),
     "timezone_name": "Asia/Jakarta",
+    "evidence_count": 38,
+    "summary": SUMMARY_TEXT,
+    "findings": FINDINGS_TEXT,
+    "citations": CITATIONS,
 }
 
 FAILURE_KWARGS = {
@@ -190,14 +232,223 @@ def test_success_payload_structure() -> None:
     assert embed["title"] == SUCCESS_TITLE
     assert embed["color"] == COLOR_SUCCESS
     fields = field_map(payload)
-    assert fields["Question"] == SUCCESS_KWARGS["question"]
-    assert fields["Status"] == "SUCCESS"
-    assert fields["Trigger"] == "Manual"
-    assert fields["Sources"] == "12"
-    assert "researchflow_latest-rag-developments_ab12cd34.md" in fields["Report"]
-    assert "researchflow_latest-rag-developments_ab12cd34.pdf" in fields["Report"]
+    assert fields["Pertanyaan"] == SUCCESS_KWARGS["question"]
+    assert fields["Status"] == "SUKSES"
+    assert fields["Pemicu"] == "manual"
+    assert "researchflow_latest-rag-developments_ab12cd34.md" in fields["Laporan"]
+    assert "researchflow_latest-rag-developments_ab12cd34.pdf" in fields["Laporan"]
     # UTC 01:00 == Jakarta 08:00.
-    assert fields["Completed"] == "2026-09-06 08:00 Asia/Jakarta"
+    assert fields["Selesai"] == "2026-09-06 08:00 Asia/Jakarta"
+
+
+# ------------------------------------------------- research-result contract
+
+
+def test_success_payload_contains_statistics() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**SUCCESS_KWARGS))
+
+    fields = field_map(payloads[0])
+    # Source count AND evidence count, straight from the execution result.
+    assert fields["📊 Statistik"] == "Sumber: 12 · Bukti: 38"
+
+
+def test_success_payload_contains_research_summary() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**SUCCESS_KWARGS))
+
+    fields = field_map(payloads[0])
+    assert fields["🔬 Ringkasan"] == SUMMARY_TEXT
+
+
+def test_success_payload_contains_bulleted_key_findings() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**SUCCESS_KWARGS))
+
+    findings_field = field_map(payloads[0])["📌 Temuan Utama"]
+    lines = findings_field.splitlines()
+    # Original bullets/numbers are normalized to uniform "• " bullets —
+    # one per finding, nothing invented, nothing dropped.
+    assert lines == [
+        "• Kurasi sumber sebelum indeksasi menaikkan kualitas jawaban.",
+        "• Evaluasi grounding kini jadi standar de facto publikasi RAG.",
+        "• Chunking adaptif menggantikan pemotongan tetap pada korpus panjang.",
+    ]
+
+
+def test_success_payload_contains_only_validated_citations() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**SUCCESS_KWARGS))
+
+    citation_field = field_map(payloads[0])["🔗 Sitasi Tervalidasi"]
+    lines = citation_field.splitlines()
+    assert len(lines) == 3
+    assert lines[0] == (
+        "[E1] [Retrieval-Augmented Generation survey]"
+        "(https://example.com/papers/rag-survey) — example.com"
+    )
+    assert lines[2].startswith("[E3] ")  # no title → domain becomes the label
+    assert "notes.example.io" in lines[2]
+    # Only URLs passed in via validated citation records appear — the
+    # embed must never invent or scrape a URL from free-form text.
+    for url in ("https://example.com/papers/rag-survey", "https://tools.example.org/grounding"):
+        assert url in citation_field
+
+
+def test_success_payload_has_no_citations_placeholder_when_empty() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "citations": ()}))
+
+    assert field_map(payloads[0])["🔗 Sitasi Tervalidasi"] == "—"
+
+
+def test_success_payload_never_attaches_files() -> None:
+    # Reports (PDF/Markdown) stay in the web app; Discord gets NO file —
+    # not even metadata about one.
+    payloads: list[dict] = []
+    requests: list[httpx.Request] = []
+    service = make_service(payloads=payloads, requests=requests)
+
+    asyncio.run(service.send_success(**SUCCESS_KWARGS))
+
+    payload = payloads[0]
+    assert set(payload) == {"allowed_mentions", "embeds"}
+    assert "files" not in payload and "attachments" not in payload["embeds"][0]
+    assert "pdf" not in requests[0].headers.get("content-type", "").lower()
+
+
+def test_success_payload_without_content_kwargs_still_works() -> None:
+    # Backwards compatibility: callers that predate the research-result
+    # kwargs (tests, older integrations) still get a valid success embed.
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+    legacy_kwargs = {
+        key: SUCCESS_KWARGS[key]
+        for key in (
+            "question", "trigger", "report_id", "sources_found",
+            "completed_at", "timezone_name",
+        )
+    }
+
+    result = asyncio.run(service.send_success(**legacy_kwargs))
+
+    assert result == STATUS_SENT
+    fields = field_map(payloads[0])
+    assert fields["Status"] == "SUKSES"
+    assert fields["📊 Statistik"] == "Sumber: 12 · Bukti: 0"
+    assert fields["🔬 Ringkasan"] == "—"
+
+
+# ------------------------------------------------------- Discord size limits
+
+
+def embed_total_length(embed: dict) -> int:
+    """Discord's embed size accounting (title + field names + values)."""
+    total = len(embed.get("title", ""))
+    for field in embed.get("fields", []):
+        total += len(field["name"]) + len(field["value"])
+    return total
+
+
+def test_huge_content_respects_discord_embed_limits() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+    huge_kwargs = {
+        **SUCCESS_KWARGS,
+        "question": "q" * 5000,
+        "summary": "s" * 5000,
+        "findings": "\n".join(f"- {'f' * 400} {i}" for i in range(50)),
+        "citations": tuple(
+            CitationSummary(
+                evidence_id=f"E{i}",
+                title="t" * 300,
+                url=f"https://example.com/{'u' * 200}/{i}",
+                domain="example.com",
+            )
+            for i in range(1, 41)
+        ),
+    }
+
+    asyncio.run(service.send_success(**huge_kwargs))
+
+    embed = payloads[0]["embeds"][0]
+    # Discord hard limits: 1024 per field value, 6000 per embed.
+    for field in embed["fields"]:
+        assert len(field["value"]) <= 1024, field["name"]
+    assert embed_total_length(embed) <= 6000
+    # Truncation markers prove nothing was silently dropped without a trace.
+    all_values = "\n".join(f["value"] for f in embed["fields"])
+    assert "+42 temuan lainnya" in all_values
+    assert "+32 sitasi tervalidasi lainnya" in all_values
+
+
+def test_summary_is_capped() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "summary": "s" * 5000}))
+
+    summary_field = field_map(payloads[0])["🔬 Ringkasan"]
+    assert len(summary_field) <= MAX_SUMMARY_LENGTH
+    assert summary_field.endswith("…")
+
+
+def test_findings_list_is_capped_to_eight_bullets() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+    findings = "\n".join(f"- Temuan nomor {i}" for i in range(1, 16))
+
+    asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "findings": findings}))
+
+    findings_field = field_map(payloads[0])["📌 Temuan Utama"]
+    lines = findings_field.splitlines()
+    assert len(lines) == MAX_FINDINGS_ITEMS + 1  # 8 bullets + overflow marker
+    assert lines[-1] == "+7 temuan lainnya"
+    assert len(findings_field) <= MAX_FINDINGS_LENGTH
+
+
+def test_citation_list_is_capped_to_eight_lines() -> None:
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+    citations = tuple(
+        CitationSummary(
+            evidence_id=f"E{i}",
+            title=f"Sumber {i}",
+            url=f"https://example.com/source-{i}",
+            domain="example.com",
+        )
+        for i in range(1, 16)
+    )
+
+    asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "citations": citations}))
+
+    citation_field = field_map(payloads[0])["🔗 Sitasi Tervalidasi"]
+    lines = citation_field.splitlines()
+    assert len(lines) == MAX_CITATION_ITEMS + 1  # 8 entries + overflow marker
+    assert lines[-1] == "+7 sitasi tervalidasi lainnya"
+    assert len(citation_field) <= MAX_CITATIONS_LENGTH
+
+
+def test_missing_findings_fall_back_to_summary() -> None:
+    # A synthesis answer without a findings section still shows the
+    # summary as the key takeaway instead of an empty field.
+    payloads: list[dict] = []
+    service = make_service(payloads=payloads)
+
+    asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "findings": ""}))
+
+    fields = field_map(payloads[0])
+    assert fields["📌 Temuan Utama"] == SUMMARY_TEXT
 
 
 def test_failure_payload_structure() -> None:
@@ -212,11 +463,11 @@ def test_failure_payload_structure() -> None:
     assert embed["title"] == FAILURE_TITLE
     assert embed["color"] == COLOR_FAILURE
     fields = field_map(payload)
-    assert fields["Question"] == FAILURE_KWARGS["question"]
-    assert fields["Status"] == "FAILED"
-    assert fields["Trigger"] == "Scheduled"
-    assert fields["Error"] == "Synthesis failed: the AI could not answer."
-    assert fields["Time"] == "2026-09-06 08:00 Asia/Jakarta"
+    assert fields["Pertanyaan"] == FAILURE_KWARGS["question"]
+    assert fields["Status"] == "GAGAL"
+    assert fields["Pemicu"] == "terjadwal"
+    assert fields["Error"] == FAILURE_KWARGS["error"]
+    assert fields["Waktu"] == "2026-09-06 08:00 Asia/Jakarta"
 
 
 def test_payloads_suppress_mentions() -> None:
@@ -256,7 +507,7 @@ def test_long_question_is_capped() -> None:
 
     asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "question": "x" * 3000}))
 
-    question_field = field_map(payloads[0])["Question"]
+    question_field = field_map(payloads[0])["Pertanyaan"]
     assert len(question_field) <= MAX_FIELD_LENGTH
 
 
@@ -276,7 +527,7 @@ def test_missing_report_id_renders_placeholder() -> None:
 
     asyncio.run(service.send_success(**{**SUCCESS_KWARGS, "report_id": ""}))
 
-    assert field_map(payloads[0])["Report"] == "—"
+    assert field_map(payloads[0])["Laporan"] == "—"
 
 
 @pytest.mark.parametrize(
@@ -295,7 +546,7 @@ def test_timestamp_rendering(timezone_name: str, expected: str) -> None:
         service.send_success(**{**SUCCESS_KWARGS, "timezone_name": timezone_name})
     )
 
-    assert field_map(payloads[0])["Completed"] == expected
+    assert field_map(payloads[0])["Selesai"] == expected
 
 
 # ---------------------------------------------------------------- HTTP layer

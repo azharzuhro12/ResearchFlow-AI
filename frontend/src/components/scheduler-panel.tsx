@@ -72,6 +72,26 @@ const NOTIFICATION_STYLES: Record<NotificationStatus, string> = {
   failed: "bg-red-950 text-red-300",
 };
 
+// Display labels for API enum values (API values stay English — they are
+// identifiers, not prose).
+const STATUS_LABELS: Record<ExecutionStatus, string> = {
+  never_run: "belum jalan",
+  running: "berjalan",
+  success: "sukses",
+  failed: "gagal",
+};
+
+const NOTIFICATION_LABELS: Record<NotificationStatus, string> = {
+  not_configured: "belum diatur",
+  sent: "terkirim",
+  failed: "gagal",
+};
+
+const TRIGGER_LABELS: Record<"manual" | "scheduled", string> = {
+  manual: "manual",
+  scheduled: "terjadwal",
+};
+
 export function SchedulerPanel() {
   const [question, setQuestion] = useState("");
   const [scheduleType, setScheduleType] = useState<ScheduleType>("interval");
@@ -199,8 +219,8 @@ export function SchedulerPanel() {
     } catch (caught) {
       setError(
         caught instanceof Error
-          ? `Failed to create schedule: ${caught.message}`
-          : "Failed to create schedule."
+          ? `Gagal membuat jadwal: ${caught.message}`
+          : "Gagal membuat jadwal."
       );
     } finally {
       setCreating(false);
@@ -260,8 +280,8 @@ export function SchedulerPanel() {
     } catch (caught) {
       setError(
         caught instanceof Error
-          ? `Action "${action}" failed: ${caught.message}`
-          : `Action "${action}" failed.`
+          ? `Aksi "${action}" gagal: ${caught.message}`
+          : `Aksi "${action}" gagal.`
       );
     } finally {
       setBusyId(null);
@@ -272,11 +292,11 @@ export function SchedulerPanel() {
     <section className="mt-14 space-y-6">
       <div className="space-y-3 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-          Scheduled Research
+          Riset Terjadwal
         </h2>
         <p className="text-sm text-zinc-400">
-          Run the full research pipeline — search, indexing, synthesis, and
-          report generation — automatically on a schedule.
+          Jalankan pipeline riset lengkap — pencarian, pengindeksan, sintesis,
+          dan pembuatan laporan — otomatis sesuai jadwal.
         </p>
       </div>
 
@@ -286,7 +306,7 @@ export function SchedulerPanel() {
             htmlFor="schedule-question"
             className="block text-sm font-medium text-zinc-300"
           >
-            Research Question
+            Pertanyaan Riset
           </label>
           <textarea
             id="schedule-question"
@@ -294,7 +314,7 @@ export function SchedulerPanel() {
             onChange={(event) => setQuestion(event.target.value)}
             rows={2}
             maxLength={2000}
-            placeholder="e.g. What are the latest developments in Retrieval-Augmented Generation?"
+            placeholder="mis. Apa perkembangan terbaru Retrieval-Augmented Generation?"
             className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
 
@@ -304,7 +324,7 @@ export function SchedulerPanel() {
                 htmlFor="schedule-type"
                 className="block text-sm font-medium text-zinc-300"
               >
-                Schedule Type
+                Tipe Jadwal
               </label>
               <select
                 id="schedule-type"
@@ -314,8 +334,8 @@ export function SchedulerPanel() {
                 }
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-zinc-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               >
-                <option value="interval">Interval (every N minutes)</option>
-                <option value="cron">Cron (e.g. daily at 08:00)</option>
+                <option value="interval">Interval (setiap N menit)</option>
+                <option value="cron">Cron (mis. tiap hari jam 08:00)</option>
               </select>
             </div>
 
@@ -325,7 +345,7 @@ export function SchedulerPanel() {
                   htmlFor="schedule-interval"
                   className="block text-sm font-medium text-zinc-300"
                 >
-                  Interval (minutes, min {MIN_INTERVAL_MINUTES})
+                  Interval (menit, min {MIN_INTERVAL_MINUTES})
                 </label>
                 <input
                   id="schedule-interval"
@@ -343,7 +363,7 @@ export function SchedulerPanel() {
                   htmlFor="schedule-cron"
                   className="block text-sm font-medium text-zinc-300"
                 >
-                  Cron Expression (5 fields)
+                  Ekspresi Cron (5 field)
                 </label>
                 <input
                   id="schedule-cron"
@@ -362,7 +382,7 @@ export function SchedulerPanel() {
                 htmlFor="schedule-timezone"
                 className="block text-sm font-medium text-zinc-300"
               >
-                Timezone (IANA)
+                Zona Waktu (IANA)
               </label>
               <input
                 id="schedule-timezone"
@@ -379,11 +399,11 @@ export function SchedulerPanel() {
           <div className="flex items-center justify-between gap-3">
             <p className="min-h-4 text-xs text-zinc-500">
               {trimmed.length > 0 && trimmed.length < MIN_QUESTION_LENGTH
-                ? `Question must be at least ${MIN_QUESTION_LENGTH} characters.`
+                ? `Pertanyaan minimal ${MIN_QUESTION_LENGTH} karakter.`
                 : scheduleType === "interval" &&
                     intervalMinutes !== "" &&
                     !intervalValid
-                  ? `Interval must be between ${MIN_INTERVAL_MINUTES} minutes and one year.`
+                  ? `Interval harus antara ${MIN_INTERVAL_MINUTES} menit dan satu tahun.`
                   : ""}
             </p>
             <button
@@ -397,7 +417,7 @@ export function SchedulerPanel() {
                   aria-hidden="true"
                 />
               )}
-              Create Schedule
+              Buat Jadwal
             </button>
           </div>
         </form>
@@ -415,7 +435,7 @@ export function SchedulerPanel() {
       <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-lg font-semibold text-zinc-100">Your Schedules</h3>
+            <h3 className="text-lg font-semibold text-zinc-100">Jadwal Kamu</h3>
             {discordSetup !== "unknown" && (
               <span
                 className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ${
@@ -423,10 +443,10 @@ export function SchedulerPanel() {
                     ? "bg-indigo-950/60 text-indigo-300"
                     : "bg-zinc-800 text-zinc-400"
                 }`}
-                title="Discord notifications are configured on the backend (Settings are backend-only)."
+                title="Notifikasi Discord dikonfigurasi di backend (pengaturan hanya ada di sisi backend)."
               >
                 Discord:{" "}
-                {discordSetup === "configured" ? "Configured" : "Not configured"}
+                {discordSetup === "configured" ? "Terkonfigurasi" : "Belum dikonfigurasi"}
               </span>
             )}
           </div>
@@ -435,23 +455,22 @@ export function SchedulerPanel() {
             onClick={() => void refreshSchedules()}
             className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-sky-500 hover:text-sky-400"
           >
-            Refresh
+            Muat Ulang
           </button>
         </div>
 
         {listStatus === "loading" && (
-          <p className="text-sm text-zinc-500">Loading schedules…</p>
+          <p className="text-sm text-zinc-500">Memuat jadwal…</p>
         )}
         {listStatus === "error" && (
           <p className="text-sm text-red-400" role="alert">
-            Unable to load schedules. Is the backend running on{" "}
-            {API_BASE_URL}?
+            Gagal memuat jadwal. Apakah backend berjalan di {API_BASE_URL}?
           </p>
         )}
         {listStatus === "ready" && schedules.length === 0 && (
           <p className="text-sm text-zinc-500">
-            No schedules yet. Schedules are persisted in SQLite and survive
-            backend restarts.
+            Belum ada jadwal. Jadwal tersimpan di SQLite dan bertahan melewati
+            restart backend.
           </p>
         )}
 
@@ -478,28 +497,28 @@ export function SchedulerPanel() {
                           : "text-amber-400"
                       }
                     >
-                      {schedule.enabled ? "Enabled" : "Paused"}
+                      {schedule.enabled ? "Aktif" : "Dijeda"}
                     </span>
                     <span
                       className={`rounded px-1.5 py-0.5 ${STATUS_STYLES[schedule.last_status]}`}
                     >
-                      {schedule.last_status}
+                      {STATUS_LABELS[schedule.last_status]}
                     </span>
                     {schedule.notification_status && (
                       <span
                         className={`rounded px-1.5 py-0.5 ${NOTIFICATION_STYLES[schedule.notification_status]}`}
-                        title="Discord notification outcome for the latest run."
+                        title="Hasil notifikasi Discord untuk run terbaru."
                       >
-                        notify: {schedule.notification_status}
+                        notifikasi: {NOTIFICATION_LABELS[schedule.notification_status]}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-zinc-500">
-                    Next run: {formatWhen(schedule.next_run_at)} · Last run:{" "}
+                    Berikutnya: {formatWhen(schedule.next_run_at)} · Terakhir:{" "}
                     {formatWhen(schedule.last_run_at)}
                     {schedule.last_report_id && (
                       <>
-                        {" · Report: "}
+                        {" · Laporan: "}
                         <a
                           href={`${API_BASE_URL}/api/research/reports/${schedule.last_report_id}/markdown`}
                           target="_blank"
@@ -522,7 +541,7 @@ export function SchedulerPanel() {
                   </p>
                   {schedule.last_error && (
                     <p className="text-xs text-red-400">
-                      Last error: {schedule.last_error}
+                      Error terakhir: {schedule.last_error}
                     </p>
                   )}
                 </div>
@@ -538,7 +557,7 @@ export function SchedulerPanel() {
                         : "text-zinc-300 hover:border-sky-500 hover:text-sky-400"
                     }`}
                   >
-                    History
+                    Riwayat
                   </button>
                   {schedule.enabled ? (
                     <button
@@ -547,7 +566,7 @@ export function SchedulerPanel() {
                       onClick={() => void handleAction(schedule.id, "pause")}
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-amber-500 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Pause
+                      Jeda
                     </button>
                   ) : (
                     <button
@@ -556,7 +575,7 @@ export function SchedulerPanel() {
                       onClick={() => void handleAction(schedule.id, "resume")}
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Resume
+                      Lanjutkan
                     </button>
                   )}
                   <button
@@ -565,7 +584,7 @@ export function SchedulerPanel() {
                     onClick={() => void handleAction(schedule.id, "run")}
                     className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-sky-500 hover:text-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Run Now
+                    Jalankan Sekarang
                   </button>
                   <button
                     type="button"
@@ -573,7 +592,7 @@ export function SchedulerPanel() {
                     onClick={() => void handleAction(schedule.id, "delete")}
                     className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Delete
+                    Hapus
                   </button>
                 </div>
               </div>
@@ -581,19 +600,19 @@ export function SchedulerPanel() {
               {historyFor === schedule.id && (
                 <div className="mt-4 space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                    Execution History (newest first, persisted in SQLite)
+                    Riwayat Eksekusi (terbaru dulu, tersimpan di SQLite)
                   </p>
                   {historyStatus === "loading" && (
-                    <p className="text-sm text-zinc-500">Loading history…</p>
+                    <p className="text-sm text-zinc-500">Memuat riwayat…</p>
                   )}
                   {historyStatus === "error" && (
                     <p className="text-sm text-red-400" role="alert">
-                      Unable to load execution history.
+                      Gagal memuat riwayat eksekusi.
                     </p>
                   )}
                   {historyStatus === "ready" && historyRows.length === 0 && (
                     <p className="text-sm text-zinc-500">
-                      This schedule has not run yet.
+                      Jadwal ini belum pernah berjalan.
                     </p>
                   )}
                   {historyStatus === "ready" &&
@@ -606,18 +625,18 @@ export function SchedulerPanel() {
                           <span
                             className={`rounded px-1.5 py-0.5 ${STATUS_STYLES[execution.status]}`}
                           >
-                            {execution.status}
+                            {STATUS_LABELS[execution.status]}
                           </span>
-                          <span>{execution.trigger_type}</span>
+                          <span>{TRIGGER_LABELS[execution.trigger_type]}</span>
                           <span>{formatWhen(execution.started_at)}</span>
                           {execution.source_count !== null && (
-                            <span>{execution.source_count} sources</span>
+                            <span>{execution.source_count} sumber</span>
                           )}
                           {execution.notification_status && (
                             <span
                               className={`rounded px-1.5 py-0.5 ${NOTIFICATION_STYLES[execution.notification_status]}`}
                             >
-                              notify: {execution.notification_status}
+                              notifikasi: {NOTIFICATION_LABELS[execution.notification_status]}
                             </span>
                           )}
                         </div>

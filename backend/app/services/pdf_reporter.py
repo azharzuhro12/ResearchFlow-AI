@@ -106,7 +106,7 @@ class PDFReporter:
         document = SimpleDocTemplate(
             str(output_path),
             pagesize=A4,
-            title="ResearchFlow AI Research Report",
+            title="Laporan Riset ResearchFlow AI",
             author="ResearchFlow AI",
             leftMargin=2 * cm,
             rightMargin=2 * cm,
@@ -118,57 +118,57 @@ class PDFReporter:
 
     def _story(self, outcome: SynthesisOutcome) -> list:
         story: list = [
-            Paragraph("Research Report", _TITLE_STYLE),
-            _para(f"Research Question: {outcome.query}", _NOTE_STYLE),
+            Paragraph("Laporan Riset", _TITLE_STYLE),
+            _para(f"Pertanyaan Riset: {outcome.query}", _NOTE_STYLE),
             Spacer(1, 6),
         ]
 
         if outcome.status == STATUS_INSUFFICIENT_EVIDENCE:
             story += [
                 _para(
-                    "Status: Insufficient Evidence — the available retrieved "
-                    "evidence was not sufficient to produce a grounded answer.",
+                    "Status: Bukti Belum Cukup — bukti yang berhasil diambil "
+                    "belum cukup untuk menghasilkan jawaban berbasis sumber.",
                     _HEADING_STYLE,
                 ),
                 _para(INSUFFICIENT_EVIDENCE_ANSWER),
-                Paragraph("Sources", _HEADING_STYLE),
-                _para("No validated sources - no citations were produced.", _NOTE_STYLE),
+                Paragraph("Sumber", _HEADING_STYLE),
+                _para("Tidak ada sumber tervalidasi - tidak ada sitasi yang dihasilkan.", _NOTE_STYLE),
             ]
             return story
 
         if outcome.status == STATUS_UNGROUNDED:
             story += [
                 _para(
-                    "Status: Ungrounded — the answer below could not be "
-                    "sufficiently grounded in the retrieved evidence; treat it "
-                    "with caution.",
+                    "Status: Tanpa Grounding — jawaban di bawah tidak dapat "
+                    "dikaitkan cukup dengan bukti yang diambil; perlakukan "
+                    "dengan hati-hati.",
                     _HEADING_STYLE,
                 ),
             ]
 
         slots = classify_answer(*split_answer_sections(outcome.answer))
         story += [
-            Paragraph("Executive Summary", _HEADING_STYLE),
-            _para(slots["summary"] or "No summary was produced by the synthesis."),
-            Paragraph("Key Findings", _HEADING_STYLE),
-            _para(slots["findings"] or "The synthesis did not report separate key findings."),
-            Paragraph("Detailed Analysis", _HEADING_STYLE),
+            Paragraph("Ringkasan Eksekutif", _HEADING_STYLE),
+            _para(slots["summary"] or "Sintesis tidak menghasilkan ringkasan."),
+            Paragraph("Temuan Utama", _HEADING_STYLE),
+            _para(slots["findings"] or "Sintesis tidak melaporkan temuan utama terpisah."),
+            Paragraph("Analisis Rinci", _HEADING_STYLE),
             # The COMPLETE validated answer; its markdown headings render bold.
             *_answer_flowables(outcome.answer),
-            Paragraph("Conclusion", _HEADING_STYLE),
+            Paragraph("Kesimpulan", _HEADING_STYLE),
             _para(slots["conclusion"]),
         ]
 
-        story.append(Paragraph("Sources", _HEADING_STYLE))
+        story.append(Paragraph("Sumber", _HEADING_STYLE))
         if not outcome.citations:
-            story.append(_para("No validated citations were attached to this answer.", _NOTE_STYLE))
+            story.append(_para("Tidak ada sitasi tervalidasi yang dilampirkan pada jawaban ini.", _NOTE_STYLE))
             return story
 
         for citation in outcome.citations:
             story += [
                 _para(f"[{citation.evidence_id}] {citation.source_title or citation.source_url}"),
                 _link_para(citation.source_url, citation.source_url),
-                _para(f"Domain: {citation.source_domain or 'unknown'} | Chunk: {citation.chunk_index}", _NOTE_STYLE),
+                _para(f"Domain: {citation.source_domain or 'tidak diketahui'} | Chunk: {citation.chunk_index}", _NOTE_STYLE),
                 Spacer(1, 6),
             ]
         return story

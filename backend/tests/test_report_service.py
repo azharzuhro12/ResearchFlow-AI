@@ -150,7 +150,7 @@ def test_generate_insufficient_evidence_still_reports(tmp_path: Path) -> None:
     )
 
     markdown = (tmp_path / result.markdown_filename).read_text()
-    assert "Insufficient Evidence" in markdown
+    assert "Bukti Belum Cukup" in markdown
     assert (tmp_path / result.pdf_filename).read_bytes()[:5] == b"%PDF-"
 
 
@@ -162,7 +162,7 @@ def test_generate_ungrounded_still_reports(tmp_path: Path) -> None:
     )
 
     markdown = (tmp_path / result.markdown_filename).read_text()
-    assert "Ungrounded" in markdown
+    assert "Tanpa Grounding" in markdown
     assert (tmp_path / result.pdf_filename).stat().st_size > 0
 
 

@@ -37,6 +37,13 @@ const SYNTHESIS_STYLES: Record<SynthesisStatus, string> = {
   ungrounded: "bg-red-950 text-red-300",
 };
 
+// Display labels for API enum values (API values stay English — identifiers).
+const SYNTHESIS_LABELS: Record<SynthesisStatus, string> = {
+  success: "sukses",
+  insufficient_evidence: "bukti kurang",
+  ungrounded: "tanpa grounding",
+};
+
 /**
  * Report catalog (Step 9): metadata of every generated report — interactive
  * runs and scheduled executions alike — straight from SQLite, newest first.
@@ -90,20 +97,20 @@ export function RecentReports() {
     <section className="mt-14 space-y-6">
       <div className="space-y-3 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
-          Generated Reports
+          Laporan yang Dihasilkan
         </h2>
         <p className="text-sm text-zinc-400">
-          Every report ever generated — interactive runs and scheduled
-          executions — with its metadata persisted in SQLite.
+          Semua laporan yang pernah dibuat — dari run interaktif maupun
+          eksekusi terjadwal — dengan metadata tersimpan di SQLite.
         </p>
       </div>
 
       <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-zinc-100">
-            Report Catalog{" "}
+            Katalog Laporan{" "}
             <span className="text-sm font-normal text-zinc-500">
-              (newest first)
+              (terbaru dulu)
             </span>
           </h3>
           <button
@@ -111,22 +118,22 @@ export function RecentReports() {
             onClick={() => void handleRefresh()}
             className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:border-sky-500 hover:text-sky-400"
           >
-            Refresh
+            Muat Ulang
           </button>
         </div>
 
         {status === "loading" && (
-          <p className="text-sm text-zinc-500">Loading reports…</p>
+          <p className="text-sm text-zinc-500">Memuat laporan…</p>
         )}
         {status === "error" && (
           <p className="text-sm text-red-400" role="alert">
-            Unable to load reports. Is the backend running on {API_BASE_URL}?
+            Gagal memuat laporan. Apakah backend berjalan di {API_BASE_URL}?
           </p>
         )}
         {status === "ready" && reports.length === 0 && (
           <p className="text-sm text-zinc-500">
-            No reports yet. Generate one from the research form above, or let a
-            schedule run.
+            Belum ada laporan. Buat dari formulir riset di atas, atau biarkan
+            jadwal berjalan.
           </p>
         )}
 
@@ -145,10 +152,10 @@ export function RecentReports() {
                     <span
                       className={`rounded px-1.5 py-0.5 ${SYNTHESIS_STYLES[report.synthesis_status]}`}
                     >
-                      {report.synthesis_status}
+                      {SYNTHESIS_LABELS[report.synthesis_status]}
                     </span>
                     <span>{formatWhen(report.created_at)}</span>
-                    {report.schedule_id && <span>scheduled run</span>}
+                    {report.schedule_id && <span>run terjadwal</span>}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

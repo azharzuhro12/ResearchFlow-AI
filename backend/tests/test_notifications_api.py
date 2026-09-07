@@ -62,8 +62,12 @@ def fake_service() -> SchedulerService:
 # ------------------------------------------------------------- status endpoint
 
 
-def test_notification_status_unconfigured_by_default() -> None:
-    # The test environment has no webhook → honest "not configured".
+def test_notification_status_unconfigured_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Force "no webhook" regardless of the developer's real backend/.env —
+    # the ambient value must never leak into this test.
+    monkeypatch.setattr(config, "DISCORD_WEBHOOK_URL", "")
     response = client.get("/api/research/notifications/status")
     assert response.status_code == 200
     payload = response.json()
@@ -119,9 +123,12 @@ def test_schedule_response_includes_notification_status(
 
 def test_manual_run_records_not_configured_notification(
     fake_service: SchedulerService,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # No webhook configured in this test → the pipeline still succeeds and
-    # the notification outcome is honestly "not_configured" (no HTTP made).
+    # No webhook configured (forced below, immune to the real backend/.env)
+    # → the pipeline still succeeds and the notification outcome is honestly
+    # "not_configured" (no HTTP made).
+    monkeypatch.setattr(config, "DISCORD_WEBHOOK_URL", "")
     created = client.post("/api/research/schedules", json=VALID_INTERVAL).json()
     schedule_id = created["schedule"]["id"]
 

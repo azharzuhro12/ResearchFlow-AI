@@ -14,6 +14,7 @@ import pytest
 from app.schemas.schedule import ScheduleCreateRequest
 from app.services.discord_service import DiscordNotificationService
 from app.services.research_execution_service import (
+    CitationSummary,
     ExecutionResult,
     ResearchExecutionError,
     ResearchExecutionService,
@@ -22,6 +23,16 @@ from app.services.scheduler_service import SchedulerService
 
 QUESTION = "What are the latest developments in Retrieval-Augmented Generation?"
 REPORT_ID = "notify-fake-report-5150beef"
+SUMMARY = "RAG berkembang ke arah kurasi sumber dan evaluasi grounding."
+FINDINGS = "- Kurasi sumber menaikkan kualitas jawaban.\n- Evaluasi grounding jadi standar."
+CITATIONS = (
+    CitationSummary(
+        evidence_id="E1",
+        title="RAG survey",
+        url="https://example.com/rag-survey",
+        domain="example.com",
+    ),
+)
 
 
 class FakeExecutionService(ResearchExecutionService):
@@ -40,6 +51,10 @@ class FakeExecutionService(ResearchExecutionService):
             indexed_sources=7,
             failed_sources=0,
             total_chunks=21,
+            evidence_count=18,
+            summary=SUMMARY,
+            findings=FINDINGS,
+            citations=CITATIONS,
         )
 
 
@@ -124,6 +139,51 @@ def test_success_sends_exactly_one_success_notification(
         svc.shutdown()
 
 
+def test_success_notification_carries_the_executions_research_result(
+    notifier: FakeNotificationService,
+) -> None:
+    # The embed must deliver THIS execution's own research result —
+    # summary, findings, evidence count, and validated citations are
+    # passed straight from the ExecutionResult the pipeline returned
+    # (no re-research, no second pipeline run for Discord's benefit).
+    svc = make_service(notifier=notifier)
+    try:
+        job = svc.create_schedule(make_request())
+        asyncio.run(svc.run_now(job.id))
+
+        call = notifier.success_calls[0]
+        assert call["summary"] == SUMMARY
+        assert call["findings"] == FINDINGS
+        assert call["evidence_count"] == 18
+        assert call["citations"] == CITATIONS
+        assert call["sources_found"] == 7
+    finally:
+        svc.shutdown()
+
+
+def test_scheduler_runs_the_pipeline_exactly_once_per_execution(
+    notifier: FakeNotificationService,
+) -> None:
+    # One execution = one pipeline run = one Discord delivery carrying
+    # that run's result. The notifier must never trigger more research.
+    runs: list[str] = []
+
+    class CountingExecution(FakeExecutionService):
+        async def run(self, question: str, top_k: int = 5) -> ExecutionResult:
+            runs.append(question)
+            return await super().run(question, top_k)
+
+    svc = make_service(execution=CountingExecution(), notifier=notifier)
+    try:
+        job = svc.create_schedule(make_request())
+        asyncio.run(svc.run_now(job.id))
+        assert runs == [QUESTION]
+        assert len(notifier.success_calls) == 1
+        assert notifier.failure_calls == []
+    finally:
+        svc.shutdown()
+
+
 def test_failed_execution_sends_exactly_one_failure_notification() -> None:
     failing = FakeExecutionService(
         error=ResearchExecutionError("Synthesis failed: timeout")
@@ -160,7 +220,7 @@ def test_unexpected_research_error_notified_with_generic_message() -> None:
 
         assert job.last_status == "failed"
         assert notifier.failure_calls[0]["error"] == (
-            "Unexpected error during scheduled research."
+            "Error tak terduga saat riset terjadwal."
         )
         assert "GLM_API_KEY" not in notifier.failure_calls[0]["error"]
     finally:

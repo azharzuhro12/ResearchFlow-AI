@@ -70,19 +70,19 @@ class GLMService:
                 response = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException:
             raise GLMServiceError(
-                "GLM API request timed out. Unable to generate research plan.",
+                "Permintaan ke GLM API habis waktu (timeout). Gagal memproses permintaan AI.",
                 http_status=504,
             ) from None
         except httpx.HTTPError:
             raise GLMServiceError(
-                "Failed to reach the GLM API. Unable to generate research plan.",
+                "Tidak dapat menghubungi GLM API. Gagal memproses permintaan AI.",
                 http_status=502,
             ) from None
 
         if response.status_code >= 400:
             raise GLMServiceError(
-                f"GLM API returned an error (HTTP {response.status_code}). "
-                "Unable to generate research plan.",
+                f"GLM API mengembalikan error (HTTP {response.status_code}). "
+                "Gagal memproses permintaan AI.",
                 http_status=502,
             ) from None
 
@@ -98,13 +98,13 @@ class GLMService:
             )
         except (ValueError, KeyError, TypeError):
             raise GLMServiceError(
-                "GLM API returned an unexpected response.",
+                "GLM API mengembalikan respons yang tidak terduga.",
                 http_status=502,
             ) from None
 
         if not text.strip():
             raise GLMServiceError(
-                "GLM API returned an empty response.",
+                "GLM API mengembalikan respons kosong.",
                 http_status=502,
             ) from None
         return text

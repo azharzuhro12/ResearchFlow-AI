@@ -10,13 +10,13 @@ export default function Home() {
         <header className="flex flex-col items-center gap-5 text-center">
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.3em] text-sky-400">
-              Autonomous · Scheduled · Grounded
+              Otonom · Terjadwal · Berbasis Sumber
             </p>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
               ResearchFlow AI
             </h1>
             <p className="text-lg text-zinc-400">
-              Autonomous AI Research Automation Platform
+              Platform Otomatisasi Riset AI Otonom
             </p>
           </div>
           <BackendStatus />

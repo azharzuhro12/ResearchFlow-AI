@@ -33,8 +33,11 @@ Security posture:
 
 Step 8: after each execution's outcome is known (success or failure),
 exactly ONE Discord notification is dispatched via
-DiscordNotificationService. Notification delivery problems are recorded
-in `job.notification_status` and never change the research status.
+DiscordNotificationService — the success embed carries that execution's
+OWN research result (summary, findings, evidence count, validated
+citations read straight from ExecutionResult; no re-research, no second
+pipeline run). Notification delivery problems are recorded in
+`job.notification_status` and never change the research status.
 """
 
 import asyncio
@@ -122,7 +125,7 @@ class SchedulerValidationError(Exception):
 class ScheduleNotFoundError(Exception):
     """No schedule with that id (→ HTTP 404). `message` is client-safe."""
 
-    def __init__(self, message: str = "Schedule not found.") -> None:
+    def __init__(self, message: str = "Jadwal tidak ditemukan.") -> None:
         super().__init__(message)
         self.message = message
 
@@ -131,7 +134,7 @@ class SchedulerPersistenceError(Exception):
     """SQLite could not be written (→ HTTP 503). `message` is client-safe."""
 
     def __init__(
-        self, message: str = "Scheduling storage is temporarily unavailable."
+        self, message: str = "Penyimpanan jadwal sementara tidak tersedia."
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -194,8 +197,8 @@ def resolve_timezone(name: str) -> ZoneInfo:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError, KeyError, OSError):
         raise SchedulerValidationError(
-            f"Unknown timezone {name!r}. Use an IANA name such as "
-            "'Asia/Jakarta' or 'UTC'."
+            f"Zona waktu {name!r} tidak dikenal. Gunakan nama IANA seperti "
+            "'Asia/Jakarta' atau 'UTC'."
         ) from None
 
 
@@ -295,7 +298,7 @@ class SchedulerService:
             raise SchedulerPersistenceError() from None
         if existing >= MAX_SCHEDULES:
             raise SchedulerValidationError(
-                f"Schedule limit reached ({MAX_SCHEDULES}). Delete one first."
+                f"Batas jumlah jadwal tercapai ({MAX_SCHEDULES}). Hapus satu dulu."
             )
         tz = resolve_timezone(request.timezone)
         trigger = self._build_trigger(request, tz)
@@ -343,7 +346,7 @@ class SchedulerService:
                     )
                 self._jobs.pop(job.id, None)
                 raise SchedulerPersistenceError(
-                    "Could not register the schedule. Please try again."
+                    "Tidak dapat mendaftarkan jadwal. Silakan coba lagi."
                 ) from None
         logger.info(
             "Schedule %s created (%s, %s, tz=%s)",
@@ -378,7 +381,7 @@ class SchedulerService:
         except PersistenceError:
             raise SchedulerPersistenceError() from None
         if row is None:
-            raise ScheduleNotFoundError("Schedule not found.")
+            raise ScheduleNotFoundError("Jadwal tidak ditemukan.")
         job = self._job_from_row(row)
         self._jobs[job.id] = job
         return job
@@ -526,7 +529,7 @@ class SchedulerService:
         except Exception:
             # Log the traceback server-side; clients only get a generic text.
             job.last_status = STATUS_FAILED
-            job.last_error = "Unexpected error during scheduled research."
+            job.last_error = "Error tak terduga saat riset terjadwal."
             logger.exception("Unexpected error executing schedule %s", job.id)
         else:
             job.last_status = STATUS_SUCCESS
@@ -572,6 +575,10 @@ class SchedulerService:
                     sources_found=result.sources_found if result else 0,
                     completed_at=completed_at,
                     timezone_name=job.timezone,
+                    evidence_count=result.evidence_count if result else 0,
+                    summary=result.summary if result else "",
+                    findings=result.findings if result else "",
+                    citations=result.citations if result else (),
                 )
             else:
                 job.notification_status = await notifier.send_failure(

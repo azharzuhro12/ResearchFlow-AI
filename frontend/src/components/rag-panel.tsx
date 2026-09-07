@@ -111,10 +111,11 @@ export function RagPanel({ sources }: RagPanelProps) {
   return (
     <section className="space-y-5">
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-        <h3 className="text-lg font-semibold text-zinc-100">Knowledge Base</h3>
+        <h3 className="text-lg font-semibold text-zinc-100">Basis Pengetahuan</h3>
         <p className="mt-1 text-sm text-zinc-400">
-          Fetch the page content of the collected sources, chunk it, embed it
-          locally, and store it in ChromaDB for semantic retrieval.
+          Ambil konten halaman dari sumber yang terkumpul, pecah menjadi chunk,
+          lakukan embedding secara lokal, dan simpan di ChromaDB untuk
+          pencarian semantik.
         </p>
         <button
           type="button"
@@ -128,7 +129,7 @@ export function RagPanel({ sources }: RagPanelProps) {
               aria-hidden="true"
             />
           )}
-          {indexStatus === "loading" ? "Indexing sources..." : "Index Sources"}
+          {indexStatus === "loading" ? "Mengindeks sumber..." : "Indeks Sumber"}
         </button>
 
         {indexStatus === "error" && (
@@ -136,21 +137,18 @@ export function RagPanel({ sources }: RagPanelProps) {
             role="alert"
             className="mt-4 rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
           >
-            Failed to index sources.
+            Gagal mengindeks sumber.
           </div>
         )}
 
         {indexStatus === "success" && indexOutcome && (
           <p className="mt-4 text-sm text-emerald-400" role="status">
-            Indexed {indexOutcome.indexedSources} source
-            {indexOutcome.indexedSources === 1 ? "" : "s"} · Created{" "}
-            {indexOutcome.totalChunks} chunk
-            {indexOutcome.totalChunks === 1 ? "" : "s"}
+            {indexOutcome.indexedSources} sumber terindeks ·{" "}
+            {indexOutcome.totalChunks} chunk dibuat
             {indexOutcome.failedSources > 0 && (
               <span className="text-amber-400">
                 {" "}
-                · {indexOutcome.failedSources} source
-                {indexOutcome.failedSources === 1 ? "" : "s"} failed
+                · {indexOutcome.failedSources} sumber gagal
               </span>
             )}
           </p>
@@ -164,7 +162,7 @@ export function RagPanel({ sources }: RagPanelProps) {
               htmlFor="rag-question"
               className="block text-sm font-medium text-zinc-300"
             >
-              Ask the Research Knowledge Base
+              Tanyakan ke Basis Pengetahuan Riset
             </label>
             <textarea
               id="rag-question"
@@ -172,14 +170,14 @@ export function RagPanel({ sources }: RagPanelProps) {
               onChange={(event) => setQuestion(event.target.value)}
               rows={2}
               maxLength={2000}
-              placeholder="Enter a question about the collected sources..."
+              placeholder="Tulis pertanyaan tentang sumber yang terkumpul..."
               className="w-full resize-y rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
             <div className="flex items-center justify-between gap-3">
               <p className="min-h-4 text-xs text-zinc-500">
                 {trimmedQuestion.length > 0 &&
                 trimmedQuestion.length < MIN_QUERY_LENGTH
-                  ? `Question must be at least ${MIN_QUERY_LENGTH} characters.`
+                  ? `Pertanyaan minimal ${MIN_QUERY_LENGTH} karakter.`
                   : ""}
               </p>
               <button
@@ -193,7 +191,7 @@ export function RagPanel({ sources }: RagPanelProps) {
                     aria-hidden="true"
                   />
                 )}
-                Retrieve
+                Ambil
               </button>
             </div>
           </form>
@@ -203,7 +201,7 @@ export function RagPanel({ sources }: RagPanelProps) {
               role="alert"
               className="mt-4 rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
             >
-              Unable to retrieve from the knowledge base. Please try again.
+              Gagal mengambil dari basis pengetahuan. Silakan coba lagi.
             </div>
           )}
         </div>
@@ -211,15 +209,14 @@ export function RagPanel({ sources }: RagPanelProps) {
 
       {retrieveStatus === "success" && chunks !== null && (
         <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-          <h3 className="text-lg font-semibold text-zinc-100">Retrieved Sources</h3>
+          <h3 className="text-lg font-semibold text-zinc-100">Sumber yang Diambil</h3>
           <p className="text-sm text-zinc-400">
-            {chunks.length} chunk{chunks.length === 1 ? "" : "s"} by semantic
-            similarity
+            {chunks.length} chunk berdasarkan kemiripan semantik
           </p>
           {chunks.length === 0 && (
             <p className="text-sm text-zinc-500">
-              No matching content found. Try a different question or index more
-              sources.
+              Tidak ada konten yang cocok. Coba pertanyaan lain atau indeks
+              lebih banyak sumber.
             </p>
           )}
           <ul className="space-y-3">
@@ -232,12 +229,12 @@ export function RagPanel({ sources }: RagPanelProps) {
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                   {chunk.source_domain && (
                     <span className="rounded bg-zinc-800 px-1.5 py-0.5">
-                      Source: {chunk.source_domain}
+                      Sumber: {chunk.source_domain}
                     </span>
                   )}
                   <span>Chunk #{chunk.chunk_index}</span>
                   {chunk.distance !== null && (
-                    <span>distance {chunk.distance.toFixed(3)}</span>
+                    <span>jarak {chunk.distance.toFixed(3)}</span>
                   )}
                 </div>
                 {chunk.source_title && (
@@ -251,7 +248,7 @@ export function RagPanel({ sources }: RagPanelProps) {
                   rel="noopener noreferrer"
                   className="mt-2 inline-block text-sm font-medium text-sky-400 transition hover:text-sky-300"
                 >
-                  Open Source →
+                  Buka Sumber →
                 </a>
               </li>
             ))}

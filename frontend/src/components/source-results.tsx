@@ -16,9 +16,9 @@ interface SourceResultsProps {
 export function SourceResults({ queries, sources, totalSources }: SourceResultsProps) {
   return (
     <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
-      <h3 className="text-lg font-semibold text-zinc-100">Research Sources</h3>
+      <h3 className="text-lg font-semibold text-zinc-100">Sumber Riset</h3>
       <p className="text-sm text-zinc-400">
-        {queries.length} search queries · {totalSources} sources found
+        {queries.length} kueri pencarian · {totalSources} sumber ditemukan
       </p>
       <ul className="space-y-3">
         {sources.map((source) => (
@@ -38,7 +38,7 @@ export function SourceResults({ queries, sources, totalSources }: SourceResultsP
               {source.source && (
                 <span className="rounded bg-zinc-800 px-1.5 py-0.5">{source.source}</span>
               )}
-              {source.published_at && <span>Published: {source.published_at}</span>}
+              {source.published_at && <span>Terbit: {source.published_at}</span>}
             </div>
             {source.snippet && (
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">{source.snippet}</p>
@@ -49,7 +49,7 @@ export function SourceResults({ queries, sources, totalSources }: SourceResultsP
               rel="noopener noreferrer"
               className="mt-3 inline-block text-sm font-medium text-sky-400 transition hover:text-sky-300"
             >
-              Open Source →
+              Buka Sumber →
             </a>
           </li>
         ))}

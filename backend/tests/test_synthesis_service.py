@@ -138,7 +138,7 @@ def test_no_evidence_skips_glm_entirely() -> None:
     assert outcome.status == "insufficient_evidence"
     assert outcome.evidence_count == 0
     assert outcome.citations == []
-    assert "not enough indexed evidence" in outcome.answer
+    assert "belum cukup" in outcome.answer
     assert glm.user_prompts == []  # GLM must NOT be called
     assert rag.calls == [("What are the latest RAG techniques?", 5)]
 

@@ -19,12 +19,42 @@ from app.services.research_execution_service import (
 )
 from app.services.search_service import SearchService, SearchServiceError
 from app.services.synthesis_service import (
+    CitationRecord,
     SynthesisOutcome,
     SynthesisService,
     SynthesisServiceError,
 )
 
 QUESTION = "What are the latest developments in Retrieval-Augmented Generation?"
+
+# A synthesis answer shaped like the real Indonesian output (sectioned,
+# with validated citation records) so research-content derivation has
+# something realistic to chew on.
+SECTIONED_ANSWER = (
+    "## Ringkasan\n"
+    "RAG berkembang pesat menuju kurasi sumber dan evaluasi grounding.\n\n"
+    "## Temuan Utama\n"
+    "- Kurasi sumber sebelum indeksasi menaikkan kualitas jawaban.\n"
+    "- Evaluasi grounding kini standar de facto.\n\n"
+    "## Kesimpulan\n"
+    "Arah riset bergerak ke grounding yang terukur."
+)
+VALIDATED_CITATIONS = [
+    CitationRecord(
+        evidence_id="E1",
+        source_title="RAG survey",
+        source_url="https://example.com/rag-survey",
+        source_domain="example.com",
+        chunk_index=3,
+    ),
+    CitationRecord(
+        evidence_id="E2",
+        source_title=None,
+        source_url="https://notes.example.org/grounding",
+        source_domain="notes.example.org",
+        chunk_index=1,
+    ),
+]
 
 
 class ScriptedPipeline:
@@ -94,7 +124,11 @@ class ScriptedPipeline:
                     raise pipeline.errors["synthesize"]
                 pipeline.synthesis_question = query
                 return SynthesisOutcome(
-                    status="success", query=query, answer="An answer.", evidence_count=5
+                    status="success",
+                    query=query,
+                    answer=SECTIONED_ANSWER,
+                    citations=list(VALIDATED_CITATIONS),
+                    evidence_count=5,
                 )
 
         class FakeReportService(ReportService):
@@ -165,17 +199,47 @@ def test_synthesis_receives_the_original_question() -> None:
     assert pipeline.report_outcome.status == "success"
 
 
+def test_result_carries_research_content_from_the_same_outcome() -> None:
+    # ExecutionResult must carry the research CONTENT (for Discord)
+    # derived from the SAME SynthesisOutcome the report was built from —
+    # using the same slot extractor as the reporters, with citations
+    # mapped from the already-validated citation records. This must not
+    # add pipeline stages or duplicate any work.
+    pipeline = ScriptedPipeline()
+    service = pipeline.build()
+
+    result = asyncio.run(service.run(QUESTION))
+
+    # No extra pipeline calls were made to gather this content.
+    assert pipeline.calls == ["queries", "search", "index", "synthesize", "report"]
+    assert result.evidence_count == 5
+    assert result.summary == (
+        "RAG berkembang pesat menuju kurasi sumber dan evaluasi grounding."
+    )
+    assert result.findings == (
+        "- Kurasi sumber sebelum indeksasi menaikkan kualitas jawaban.\n"
+        "- Evaluasi grounding kini standar de facto."
+    )
+    # Citations come from the VALIDATED records only — URLs and domains
+    # are copied from source metadata, never re-derived from answer text.
+    assert [c.evidence_id for c in result.citations] == ["E1", "E2"]
+    assert result.citations[0].url == "https://example.com/rag-survey"
+    assert result.citations[0].domain == "example.com"
+    assert result.citations[1].title == ""  # None source_title → empty, not "None"
+    assert result.citations[1].url == "https://notes.example.org/grounding"
+
+
 @pytest.mark.parametrize(
     ("stage", "error", "expected_prefix"),
     [
-        ("search", SearchServiceError("web search unavailable"), "Search failed:"),
-        ("index", RAGServiceError("vector store unavailable"), "Indexing failed:"),
+        ("search", SearchServiceError("web search unavailable"), "Pencarian gagal:"),
+        ("index", RAGServiceError("vector store unavailable"), "Pengindeksan gagal:"),
         (
             "synthesize",
             SynthesisServiceError("the AI could not answer"),
-            "Synthesis failed:",
+            "Sintesis gagal:",
         ),
-        ("report", ReportServiceError("disk full"), "Report generation failed:"),
+        ("report", ReportServiceError("disk full"), "Pembuatan laporan gagal:"),
     ],
 )
 def test_stage_failures_raise_client_safe_errors(

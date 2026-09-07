@@ -118,7 +118,7 @@ class ReportService:
         except Exception as exc:
             logger.exception("Failed to write the Markdown report")
             raise ReportServiceError(
-                "Failed to write the report files.", http_status=500
+                "Gagal menulis file laporan.", http_status=500
             ) from exc
 
         try:
@@ -127,7 +127,7 @@ class ReportService:
             markdown_path.unlink(missing_ok=True)  # no half-written pairs
             logger.exception("Failed to render the PDF report")
             raise ReportServiceError(
-                "Failed to generate the PDF report.", http_status=500
+                "Gagal membuat laporan PDF.", http_status=500
             ) from exc
 
         logger.info(

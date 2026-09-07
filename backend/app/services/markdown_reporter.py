@@ -30,9 +30,19 @@ _INLINE_SPECIALS = str.maketrans(
     }
 )
 
-_SUMMARY_KEYS = ("summary", "executivesummary", "overview")
-_FINDINGS_KEYS = ("finding", "findings", "keyfindings")
-_CONCLUSION_KEYS = ("conclusion", "conclusions", "takeaway", "takeaways")
+# Slot keys match headings in BOTH English and Indonesian — the synthesis
+# prompt asks for Indonesian headers (## Ringkasan, ## Temuan Utama,
+# ## Kesimpulan) but English headings from older answers still classify.
+_SUMMARY_KEYS = ("summary", "executivesummary", "overview", "ringkasan", "ikhtisar")
+_FINDINGS_KEYS = ("finding", "findings", "keyfindings", "temuan")
+_CONCLUSION_KEYS = (
+    "conclusion",
+    "conclusions",
+    "takeaway",
+    "takeaways",
+    "kesimpulan",
+    "catatanpenutup",
+)
 
 
 class Section:
@@ -101,8 +111,8 @@ def classify_answer(sections: list[Section], preamble: str) -> dict[str, str]:
         slots["summary"] = fallback_text.split("\n\n")[0].strip()
     if not slots["conclusion"]:
         slots["conclusion"] = (
-            "The synthesis did not produce an explicit conclusion section; "
-            "see the detailed analysis above."
+            "Sintesis tidak menghasilkan bagian kesimpulan eksplisit; lihat "
+            "analisis rinci di atas."
         )
     return slots
 
@@ -111,68 +121,70 @@ def render_markdown(outcome: SynthesisOutcome) -> str:
     """Render a validated synthesis outcome as a Markdown research report."""
     question = _escape_inline(_one_line(outcome.query))
     lines: list[str] = [
-        "# Research Report",
+        "# Laporan Riset",
         "",
-        f"**Research Question:** {question}",
+        f"**Pertanyaan Riset:** {question}",
         "",
     ]
 
     if outcome.status == STATUS_INSUFFICIENT_EVIDENCE:
         lines += [
-            "> **Status: Insufficient Evidence**",
+            "> **Status: Bukti Belum Cukup**",
             ">",
-            "> The available retrieved evidence was not sufficient to produce "
-            + "a grounded research answer. Index more sources and try again.",
+            "> Bukti yang berhasil diambil belum cukup untuk menghasilkan "
+            + "jawaban riset yang berbasis sumber. Indeks lebih banyak sumber "
+            + "lalu coba lagi.",
             "",
-            "## Detailed Analysis",
+            "## Analisis Rinci",
             "",
             _escape_inline(INSUFFICIENT_EVIDENCE_ANSWER),
             "",
-            "## Sources",
+            "## Sumber",
         ]
         if not outcome.citations:
             lines.append("")
-            lines.append("_No validated sources — no citations were produced._")
+            lines.append("_Tidak ada sumber tervalidasi — tidak ada sitasi yang dihasilkan._")
         return "\n".join(lines).rstrip() + "\n"
 
     if outcome.status == STATUS_UNGROUNDED:
         lines += [
-            "> **Status: Ungrounded**",
+            "> **Status: Tanpa Grounding**",
             ">",
-            "> The generated answer could not be sufficiently grounded in the "
-            + "retrieved evidence — treat the analysis below with caution.",
+            "> Jawaban yang dihasilkan tidak dapat dikaitkan cukup dengan "
+            + "bukti yang diambil — perlakukan analisis di bawah dengan "
+            + "hati-hati.",
             "",
         ]
 
     slots = classify_answer(*split_answer_sections(outcome.answer))
     lines += [
-        "## Executive Summary",
+        "## Ringkasan Eksekutif",
         "",
-        slots["summary"] or "No summary was produced by the synthesis.",
+        slots["summary"] or "Sintesis tidak menghasilkan ringkasan.",
         "",
-        "## Key Findings",
+        "## Temuan Utama",
         "",
-        slots["findings"] or "The synthesis did not report separate key findings.",
+        slots["findings"] or "Sintesis tidak melaporkan temuan utama terpisah.",
         "",
-        "## Detailed Analysis",
+        "## Analisis Rinci",
         "",
         # The COMPLETE validated synthesis answer, verbatim — headings and
         # citation markers preserved.
         outcome.answer,
         "",
-        "## Conclusion",
+        "## Kesimpulan",
         "",
         slots["conclusion"],
         "",
-        "## Sources",
+        "## Sumber",
     ]
 
     if not outcome.citations:
-        lines += ["", "_No validated citations were attached to this answer._"]
+        lines += ["", "_Tidak ada sitasi tervalidasi yang dilampirkan pada jawaban ini._"]
     else:
         for citation in outcome.citations:
             title = _escape_inline(_one_line(citation.source_title or citation.source_url))
-            domain = _escape_inline(_one_line(citation.source_domain or "unknown"))
+            domain = _escape_inline(_one_line(citation.source_domain or "tidak diketahui"))
             url = citation.source_url.replace("(", "%28").replace(")", "%29")
             lines += [
                 "",

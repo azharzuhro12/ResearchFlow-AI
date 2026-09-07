@@ -314,7 +314,7 @@ def test_schedule_limit_is_enforced(
         svc.create_schedule(interval_request(minutes=20, question="Question number two here"))
         with pytest.raises(SchedulerValidationError) as excinfo:
             svc.create_schedule(interval_request(minutes=30))
-        assert "limit" in str(excinfo.value)
+        assert "Batas jumlah jadwal" in str(excinfo.value)
     finally:
         svc.shutdown()
 
@@ -427,7 +427,7 @@ def test_unexpected_error_is_wrapped_client_safe(service: SchedulerService) -> N
         job = exploding_service.create_schedule(interval_request())
         asyncio.run(exploding_service.run_now(job.id))
         assert job.last_status == "failed"
-        assert job.last_error == "Unexpected error during scheduled research."
+        assert job.last_error == "Error tak terduga saat riset terjadwal."
         assert "GLM_API_KEY" not in (job.last_error or "")
         assert "traceback" not in (job.last_error or "").lower()
     finally:

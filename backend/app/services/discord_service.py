@@ -1,32 +1,44 @@
 """Discord notifications for scheduled research executions (Step 8).
 
-Sends ONE compact embed per execution — after the scheduler knows the
-research outcome (success or failure). The service is independent of
-APScheduler: it exposes ``send_success`` / ``send_failure`` that return a
-notification status string and never raise, so a Discord outage can never
-change a research execution's status.
+Sends ONE embed per execution carrying the RESEARCH RESULT itself —
+summary, key findings, statistics, and validated citations — after the
+scheduler knows the outcome (success or failure). The service is
+independent of APScheduler: it exposes ``send_success`` /
+``send_failure`` that return a notification status string and never
+raise, so a Discord outage can never change a research execution's
+status.
 
 Security posture:
 - The webhook URL comes ONLY from backend environment configuration and is
   validated against a strict allowlist (HTTPS + Discord hosts + webhook
   path). A malformed or foreign URL fails closed: notifications are
   treated as not configured, and no request is ever sent elsewhere (SSRF).
-- Messages carry a short summary only — no answer text, no source
-  snippets, no stack traces, no API keys, no environment values.
+- Message content is drawn from the execution's own result object: the
+  summary/findings come from the synthesis answer and citation URLs come
+  ONLY from citation records already validated against retrieved source
+  metadata — never from free-form LLM output. No stack traces, no API
+  keys, no environment values ever enter a payload.
 - ``allowed_mentions`` is emptied so research-question text can never
   ping ``@everyone`` / ``@here`` through the payload (payload injection).
 - Failures are logged without the URL and retried at most once.
+- Reports are NEVER attached to Discord (size and safety); the embed only
+  names the report files, which stay downloadable from the web app.
 """
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
 from app.core import config
+
+if TYPE_CHECKING:  # keep the runtime import chain free of reportlab
+    from app.services.research_execution_service import CitationSummary
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +67,20 @@ MAX_FIELD_LENGTH = 1000
 # Client-safe error snippets are short by construction; hard cap anyway.
 MAX_ERROR_LENGTH = 500
 
+# Content-field budgets. Discord caps a whole embed at 6000 chars; with
+# question ≤ 1000 and each content field ≤ 1000 the worst-case total stays
+# around ~4300 — safely inside the limit without a global trimmer. The
+# per-line caps are chosen so the WORST case (every line maxed, plus the
+# "+N lainnya" overflow marker) still fits its field budget — the marker
+# is never the thing that gets clipped away.
+MAX_SUMMARY_LENGTH = 900
+MAX_FINDINGS_LENGTH = 900
+MAX_FINDINGS_ITEMS = 8
+MAX_FINDING_LINE_LENGTH = 105  # 8 lines + newlines + marker ≤ 900
+MAX_CITATIONS_LENGTH = 1000
+MAX_CITATION_ITEMS = 8
+MAX_CITATION_LINE_LENGTH = 110  # 8 lines + newlines + marker ≤ 1000
+
 COLOR_SUCCESS = 0x22C55E  # green
 COLOR_FAILURE = 0xEF4444  # red
 
@@ -63,8 +89,16 @@ COLOR_FAILURE = 0xEF4444  # red
 # chain light — pdf_reporter/reportlab must not load for notifications).
 _REPORT_FILENAME_PREFIX = "researchflow_"
 
-SUCCESS_TITLE = "ResearchFlow AI — Research Completed"
-FAILURE_TITLE = "ResearchFlow AI — Research Failed"
+SUCCESS_TITLE = "ResearchFlow AI — Hasil Riset"
+FAILURE_TITLE = "ResearchFlow AI — Riset Gagal"
+
+# Trigger constants are identifiers (stored in SQLite); display them in
+# Indonesian inside the embed.
+_TRIGGER_LABELS = {"Manual": "manual", "Scheduled": "terjadwal"}
+
+
+def _trigger_label(trigger: str) -> str:
+    return _TRIGGER_LABELS.get(trigger, trigger)
 
 
 def is_valid_discord_webhook_url(url: str) -> bool:
@@ -136,6 +170,77 @@ def _report_files_value(report_id: str) -> str:
     )
 
 
+def _bulletize_findings(findings: str) -> str:
+    """Render the findings slot as compact bullet lines.
+
+    Accepts the synthesis answer's findings section in any shape — bullet
+    lists, numbered lists, or a plain paragraph — and normalizes it to
+    `• ` lines, capped at MAX_FINDINGS_ITEMS with a "+N lainnya" marker.
+    Nothing is invented: every line is original answer text, clipped.
+    """
+    if not findings.strip():
+        return ""
+    items: list[str] = []
+    for raw_line in findings.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        # Strip an existing bullet/number prefix so all lines match.
+        for prefix in ("- ", "* ", "• ", "– ", "— "):
+            if line.startswith(prefix):
+                line = line[len(prefix):].strip()
+                break
+        else:
+            if len(line) > 2 and line[0].isdigit() and line[1] in ".)":
+                line = line[2:].strip()
+        if line:
+            items.append(line)
+    if not items:
+        return ""
+    hidden = max(0, len(items) - MAX_FINDINGS_ITEMS)
+    shown = items[:MAX_FINDINGS_ITEMS]
+    lines = [_clip(f"• {item}", MAX_FINDING_LINE_LENGTH) for item in shown]
+    if hidden:
+        lines.append(f"+{hidden} temuan lainnya")
+    return "\n".join(lines)
+
+
+def _citation_lines(citations: Sequence[CitationSummary]) -> str:
+    """Render validated citations as single-line, clickable entries.
+
+    Each entry is built ONLY from citation records the synthesis pipeline
+    already validated against retrieved source metadata (never from
+    free-form LLM text). The clickable form `[E1] [Title](url) — domain`
+    is used when the WHOLE line fits the per-line cap — otherwise the
+    plain `[E1] Title — domain` form, so a URL is never clipped mid-link
+    into something misleading. Long lists are capped at MAX_CITATION_ITEMS
+    with a "+N sitasi lainnya" marker; markdown-breaking characters are
+    stripped from the title and every entry is forced onto one line.
+    """
+    if not citations:
+        return ""
+    lines: list[str] = []
+    for citation in citations[:MAX_CITATION_ITEMS]:
+        # str() + whitespace collapse forces one clean line per entry;
+        # `or ""` keeps a None field from rendering as the text "None".
+        evidence_id = " ".join(str(citation.evidence_id or "").split())
+        title = " ".join(str(citation.title or "").split())
+        domain = " ".join(str(citation.domain or "").split())
+        url = " ".join(str(citation.url or "").split())
+        title = title.replace("[", "(").replace("]", ")")
+        label = title or domain or "Sumber"
+        suffix = f" — {domain}" if domain and domain != label else ""
+        entry = f"[{evidence_id}] {label}{suffix}"
+        linked = f"[{evidence_id}] [{label}]({url}){suffix}"
+        if url.startswith("https://") and len(linked) <= MAX_CITATION_LINE_LENGTH:
+            entry = linked  # whole link fits → make it clickable
+        lines.append(_clip(entry, MAX_CITATION_LINE_LENGTH))
+    hidden = max(0, len(citations) - MAX_CITATION_ITEMS)
+    if hidden:
+        lines.append(f"+{hidden} sitasi tervalidasi lainnya")
+    return "\n".join(lines)
+
+
 class DiscordNotificationService:
     """Posts compact result embeds to a Discord incoming webhook."""
 
@@ -171,8 +276,19 @@ class DiscordNotificationService:
         sources_found: int,
         completed_at: datetime,
         timezone_name: str,
+        evidence_count: int = 0,
+        summary: str = "",
+        findings: str = "",
+        citations: Sequence[CitationSummary] = (),
     ) -> str:
-        """Notify that a scheduled research run completed. Never raises."""
+        """Deliver one execution's research result to Discord. Never raises.
+
+        `summary` / `findings` / `citations` / `evidence_count` all come
+        from the SAME SynthesisOutcome the report was generated from (the
+        scheduler passes ExecutionResult fields straight through); this
+        method does no pipeline work of its own. New kwargs default to
+        empty so older callers still produce a valid embed.
+        """
         payload = {
             # Empty parse list: question text can never trigger mentions.
             "allowed_mentions": {"parse": []},
@@ -181,13 +297,32 @@ class DiscordNotificationService:
                     "title": SUCCESS_TITLE,
                     "color": COLOR_SUCCESS,
                     "fields": [
-                        _field("Question", question, inline=False),
-                        _field("Status", "SUCCESS"),
-                        _field("Trigger", trigger),
-                        _field("Sources", str(sources_found)),
-                        _field("Report", _report_files_value(report_id), inline=False),
+                        _field("Pertanyaan", question, inline=False),
+                        _field("Status", "SUKSES"),
+                        _field("Pemicu", _trigger_label(trigger)),
                         _field(
-                            "Completed",
+                            "📊 Statistik",
+                            f"Sumber: {sources_found} · Bukti: {evidence_count}",
+                        ),
+                        _field(
+                            "🔬 Ringkasan",
+                            _clip(summary, MAX_SUMMARY_LENGTH),
+                            inline=False,
+                        ),
+                        _field(
+                            "📌 Temuan Utama",
+                            _bulletize_findings(findings)
+                            or _clip(summary, MAX_FINDINGS_LENGTH),
+                            inline=False,
+                        ),
+                        _field(
+                            "🔗 Sitasi Tervalidasi",
+                            _citation_lines(citations),
+                            inline=False,
+                        ),
+                        _field("Laporan", _report_files_value(report_id), inline=False),
+                        _field(
+                            "Selesai",
                             _format_timestamp(completed_at, timezone_name),
                             inline=False,
                         ),
@@ -214,12 +349,12 @@ class DiscordNotificationService:
                     "title": FAILURE_TITLE,
                     "color": COLOR_FAILURE,
                     "fields": [
-                        _field("Question", question, inline=False),
-                        _field("Status", "FAILED"),
-                        _field("Trigger", trigger),
+                        _field("Pertanyaan", question, inline=False),
+                        _field("Status", "GAGAL"),
+                        _field("Pemicu", _trigger_label(trigger)),
                         _field("Error", _clip(error, MAX_ERROR_LENGTH), inline=False),
                         _field(
-                            "Time",
+                            "Waktu",
                             _format_timestamp(occurred_at, timezone_name),
                             inline=False,
                         ),

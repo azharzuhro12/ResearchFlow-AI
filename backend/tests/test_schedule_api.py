@@ -156,7 +156,7 @@ def test_create_invalid_timezone_returns_422(fake_service: SchedulerService) -> 
     body = {**VALID_CRON, "timezone": "Mars/Olympus"}
     response = client.post("/api/research/schedules", json=body)
     assert response.status_code == 422
-    assert "timezone" in response.json()["detail"].lower()
+    assert "zona waktu" in response.json()["detail"].lower()
 
 
 # --------------------------------------------------------------------- list

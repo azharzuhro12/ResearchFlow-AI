@@ -102,7 +102,7 @@ def test_thinking_only_response_returns_empty_error() -> None:
         asyncio.run(service.complete("system", "user"))
 
     assert exc_info.value.http_status == 502
-    assert "empty" in exc_info.value.message
+    assert "kosong" in exc_info.value.message
 
 
 def test_not_configured_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:

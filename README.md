@@ -14,8 +14,9 @@ ResearchFlow AI is an end-to-end local research assistant. You give it a
 question; it plans the research, searches the free web, extracts and indexes
 the sources into a local vector database, synthesizes a grounded answer with
 inline citations that are **validated server-side**, renders Markdown + PDF
-reports, and can do all of that automatically on any schedule — notifying you
-on Discord when each report is ready.
+reports, and can do all of that automatically on any schedule — delivering
+the research result itself (summary, key findings, statistics, validated
+citations) to Discord when each report is ready.
 
 Everything runs locally except two things: the **GLM API** (the only paid
 dependency) and the free DuckDuckGo-based web search. No other API keys, no
@@ -76,8 +77,9 @@ constraint rather than a nice-to-have:
 - Markdown + PDF report generation, fully offline (ReportLab)
 - Scheduled recurring research: interval or five-field cron, IANA
   timezones, pause/resume/manual-run, concurrency guards, frequency floor
-- Discord notification per execution (one compact embed — success or
-  failure, never both)
+- Discord notification per execution (one embed carrying the research
+  result — summary, key findings, source/evidence statistics, validated
+  citations; or a failure embed, never both)
 - SQLite persistence: schedules, execution history, report metadata —
   restored automatically on startup
 - Execution-history API per schedule (newest first, bounded limits)
@@ -350,8 +352,22 @@ Endpoints (`/api/research/schedules`):
 
 ## 15. Discord Notifications
 
-- One compact embed **per execution**, sent **after** the outcome is
+- One embed **per execution**, sent **after** the outcome is
   known — success or failure, never both, never in-between states.
+- The **success embed carries the research result itself**: the summary,
+  key findings (normalized to bullets), statistics (sources found ·
+  evidence chunks), and the **validated citations** — evidence IDs with
+  source title/domain links taken ONLY from citation records the
+  synthesis pipeline already validated against retrieved source
+  metadata, never from free-form LLM output. The content is re-derived
+  from the same synthesis outcome the report was generated from — no
+  re-research, no second pipeline run, one delivery per execution.
+- **No attachments**: the Markdown/PDF reports are never posted to
+  Discord. The embed names the report files; the full reports stay
+  downloadable from the web app (Report Catalog).
+- Content is size-safe for Discord: per-field and per-embed budgets with
+  explicit `+N lainnya` overflow markers — long findings/citation lists
+  are truncated visibly, never silently.
 - The webhook URL is a **backend-only secret**: strict validation
   (HTTPS, `discord.com`/`discordapp.com` hosts, `/api/webhooks/` path,
   no ports/userinfo/dot-segments — fail-closed to `not_configured`),
@@ -593,11 +609,13 @@ distributed SaaS:
   scope); the tool fetches public web pages, not internal networks.
 - Discord delivery is an incoming webhook — post-only, one channel, no
   bot commands or reads.
-- **English-first by design**: the UI, research plans, and search queries
-  are English-only. A question in another language (e.g. Indonesian) is
-  understood by GLM, but queries and sources stay English and the
-  embedding model is English-optimized, so non-English retrieval quality
-  is lower and output language is not guaranteed.
+- **Indonesian UI and output, English search**: the UI, research plans,
+  synthesized answers, reports (MD/PDF), and Discord notifications are in
+  Bahasa Indonesia. Search queries are deliberately generated in English
+  because most indexed web sources and the embedding model are
+  English-optimized — retrieval quality in other languages is lower.
+  Client-facing error messages are Indonesian; API enum values
+  (`running`, `success`, `manual`, ...) and developer logs stay English.
 
 ## 24. Future Improvements
 
