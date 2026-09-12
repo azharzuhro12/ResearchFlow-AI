@@ -18,8 +18,6 @@ tervalidasi) setiap laporan selesai.
 
 - [Tentang Proyek](#tentang-proyek)
 - [Fitur Utama](#fitur-utama)
-- [Quick Start](#quick-start)
-- [Konfigurasi](#konfigurasi)
 - [Cara Pakai](#cara-pakai)
 - [Arsitektur](#arsitektur)
 - [Cara Kerja Pipeline](#cara-kerja-pipeline)
